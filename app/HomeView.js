@@ -50,6 +50,10 @@ export default function HomeView({ link }) {
           </div>
         </a>
 
+        <div className="navr">
+          <a className="web" href="https://emahairshop.com/" target="_blank" rel="noopener noreferrer" aria-label="emahairshop.com" title="emahairshop.com">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>
+          </a>
         <div className={`lw${open ? " o" : ""}`} ref={wrap}>
           <button
             className="lb" type="button" aria-label={t.lang} aria-haspopup="true" aria-expanded={open}
@@ -67,6 +71,7 @@ export default function HomeView({ link }) {
               </button>
             ))}
           </div>
+        </div>
         </div>
       </header>
 
