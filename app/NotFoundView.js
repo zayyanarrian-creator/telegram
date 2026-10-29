@@ -41,7 +41,7 @@ export default function NotFoundView() {
   return (
     <>
       <header className="topnav">
-        <a href="https://emahairshop.com/" aria-label="EMAHAIRSHOP">
+        <a href="/" aria-label="EMAHAIRSHOP">
           <div className="logo-nav-container">
             <div className="logo-top"><span className="line-top"></span><span className="text-ext">EXTENSION</span></div>
             <div className="logo-main">EMAHAIRSHOP</div>
@@ -75,7 +75,7 @@ export default function NotFoundView() {
         <div className="nf-rule"></div>
         <h1>{t.n1}</h1>
         <p className="nf-sub">{t.n2}</p>
-        <a className="nf-link" href="https://emahairshop.com/">
+        <a className="nf-link" href="/">
           <span className="nf-ico">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
           </span>
