@@ -104,3 +104,11 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
   .content { padding: 18px 16px 48px; }
   .topbar h1 { font-size: 1.35rem; }
 }
+
+/* ===== Otak asisten ===== */
+textarea.brain { min-height: 340px; max-height: 70vh; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 500; margin: 0 0 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.pill { display: inline-block; padding: 2px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; line-height: 1.6; }
+.pill.ok { background: var(--ok); color: var(--card); }
+.pill.off { background: var(--line); color: var(--mute); }

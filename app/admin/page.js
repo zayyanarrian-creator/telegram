@@ -170,7 +170,7 @@ function Dash({ onLogout }) {
   const [wh, setWh] = useState(null);
   const [token, setToken] = useState("");
   const [reply, setReply] = useState("");
-  const [ai, setAi] = useState({ model: "", systemPrompt: "", fallbackText: "", historyLimit: 10 });
+  const [ai, setAi] = useState({ model: "", systemPrompt: "", promptOn: true, fallbackText: "", historyLimit: 10 });
   const [lim, setLim] = useState({ limitCount: 20, limitMinutes: 60, limitText: "" });
   const [logs, setLogs] = useState(null);
   const [newKey, setNewKey] = useState("");
@@ -207,7 +207,7 @@ function Dash({ onLogout }) {
   async function load() {
     const c = await api("/api/admin/settings");
     setCfg(c); setReply(c.replyText);
-    setAi({ model: c.model, systemPrompt: c.systemPrompt, fallbackText: c.fallbackText, historyLimit: c.historyLimit });
+    setAi({ model: c.model, systemPrompt: c.systemPrompt, promptOn: c.promptOn, fallbackText: c.fallbackText, historyLimit: c.historyLimit });
     setLim({ limitCount: c.limitCount, limitMinutes: c.limitMinutes, limitText: c.limitText });
     setKeys(await api("/api/admin/keys"));
     setLogs((await api("/api/admin/logs").catch(() => ({ logs: [] }))).logs);
@@ -382,42 +382,78 @@ function Dash({ onLogout }) {
         );
       }
 
-      case "ai": return (
-        <section className="card">
-          <h2>Perilaku AI</h2>
-          <div className="field">
-            <label htmlFor="md">Model Gemini</label>
-            <input id="md" list="models" value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} autoComplete="off" />
-            <datalist id="models">
-              <option value="gemini-3.1-flash-lite" />
-              <option value="gemini-3.8-flash" />
-            </datalist>
-            <p className="muted hint">Kalau tes bilang model tidak ditemukan, cek nama model terbaru di ai.google.dev.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="sp">System prompt</label>
-            <textarea id="sp" value={ai.systemPrompt} onChange={(e) => setAi({ ...ai, systemPrompt: e.target.value })} maxLength={4000} />
-            <p className="muted hint">Instruksi tetap untuk AI: peran, gaya bahasa, batasan topik.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="hl">Riwayat chat (jumlah tanya-jawab yang diingat, 0 sampai 20)</label>
-            <input id="hl" type="number" min={0} max={20} value={ai.historyLimit}
-              onChange={(e) => setAi({ ...ai, historyLimit: e.target.value })} />
-            <p className="muted hint">Pengguna bisa menghapus riwayatnya sendiri dengan mengetik /reset. Riwayat hilang otomatis setelah 7 hari tanpa percakapan.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="fb">Pesan cadangan</label>
-            <textarea id="fb" style={{ minHeight: 70 }} value={ai.fallbackText} onChange={(e) => setAi({ ...ai, fallbackText: e.target.value })} maxLength={500} />
-            <p className="muted hint">Dikirim ke pengguna kalau Gemini gagal menjawab (semua key kena batas, error, atau tidak ada key).</p>
-          </div>
-          <Btn busy={busy === "ai"} disabled={anyBusy}
-            onClick={() => run("ai", () => api("/api/admin/settings", {
-              model: ai.model, systemPrompt: ai.systemPrompt, fallbackText: ai.fallbackText, historyLimit: Number(ai.historyLimit),
-            }), "Pengaturan AI disimpan.")}>
-            {busy === "ai" ? "Menyimpan…" : "Simpan pengaturan AI"}
-          </Btn>
-        </section>
-      );
+      case "ai": {
+        const dirty = ai.systemPrompt !== cfg.systemPrompt || ai.promptOn !== cfg.promptOn;
+        const isDefault = cfg.systemPrompt === cfg.defaultPrompt;
+        return (
+          <>
+            <section className="card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                <h2>Otak asisten</h2>
+                <span className={"pill " + (cfg.promptOn ? "ok" : "off")}>{cfg.promptOn ? "Aktif" : "Mati"}</span>
+              </div>
+              <p className="muted">
+                Instruksi tetap untuk AI: peran, info bisnis, gaya bahasa, dan batasan topik. Teks ini dikirim ke Gemini di setiap balasan.
+              </p>
+              <label className="check">
+                <input type="checkbox" checked={ai.promptOn} onChange={(e) => setAi({ ...ai, promptOn: e.target.checked })} />
+                <span>Pakai otak ini (kalau mati, bot memakai instruksi bawaan)</span>
+              </label>
+              <div className="field">
+                <label htmlFor="sp">
+                  Teks otak · {dirty ? "belum disimpan" : "tersimpan"} · {ai.systemPrompt.length} / {cfg.promptMax} karakter
+                </label>
+                <textarea id="sp" className="brain" value={ai.systemPrompt} maxLength={cfg.promptMax}
+                  onChange={(e) => setAi({ ...ai, systemPrompt: e.target.value })} spellCheck={false} />
+              </div>
+              <div className="row">
+                <Btn busy={busy === "brain"} disabled={!dirty || anyBusy}
+                  onClick={() => run("brain", () => api("/api/admin/settings", { systemPrompt: ai.systemPrompt, promptOn: ai.promptOn }), "Otak asisten disimpan.")}>
+                  {busy === "brain" ? "Menyimpan…" : "Simpan"}
+                </Btn>
+                <Btn className="ghost" busy={busy === "undo"} disabled={!cfg.hasPrev || anyBusy}
+                  onClick={() => run("undo", () => api("/api/admin/settings", { promptAction: "undo" }), "Perubahan terakhir dibatalkan.")}>
+                  {busy === "undo" ? "Membatalkan…" : "Batalkan perubahan terakhir"}
+                </Btn>
+                <Btn className="ghost" busy={busy === "reset"} disabled={isDefault || anyBusy}
+                  onClick={() => { if (confirm("Kembalikan teks otak ke bawaan? Teks sekarang masih bisa dikembalikan lewat Batalkan perubahan terakhir.")) run("reset", () => api("/api/admin/settings", { promptAction: "reset" }), "Otak dikembalikan ke bawaan."); }}>
+                  {busy === "reset" ? "Mengembalikan…" : "Kembalikan ke bawaan"}
+                </Btn>
+              </div>
+            </section>
+
+            <section className="card">
+              <h2>Model dan balasan</h2>
+              <div className="field">
+                <label htmlFor="md">Model Gemini</label>
+                <input id="md" list="models" value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} autoComplete="off" />
+                <datalist id="models">
+                  <option value="gemini-3.1-flash-lite" />
+                  <option value="gemini-3.8-flash" />
+                </datalist>
+                <p className="muted hint">Kalau tes bilang model tidak ditemukan, cek nama model terbaru di ai.google.dev.</p>
+              </div>
+              <div className="field">
+                <label htmlFor="hl">Riwayat chat (jumlah tanya-jawab yang diingat, 0 sampai 20)</label>
+                <input id="hl" type="number" min={0} max={20} value={ai.historyLimit}
+                  onChange={(e) => setAi({ ...ai, historyLimit: e.target.value })} />
+                <p className="muted hint">Pengguna bisa menghapus riwayatnya sendiri dengan mengetik /reset. Riwayat hilang otomatis setelah 7 hari tanpa percakapan.</p>
+              </div>
+              <div className="field">
+                <label htmlFor="fb">Pesan cadangan</label>
+                <textarea id="fb" style={{ minHeight: 70 }} value={ai.fallbackText} onChange={(e) => setAi({ ...ai, fallbackText: e.target.value })} maxLength={500} />
+                <p className="muted hint">Dikirim ke pengguna kalau Gemini gagal menjawab (semua key kena batas, error, atau tidak ada key).</p>
+              </div>
+              <Btn busy={busy === "ai"} disabled={anyBusy}
+                onClick={() => run("ai", () => api("/api/admin/settings", {
+                  model: ai.model, fallbackText: ai.fallbackText, historyLimit: Number(ai.historyLimit),
+                }), "Pengaturan AI disimpan.")}>
+                {busy === "ai" ? "Menyimpan…" : "Simpan pengaturan AI"}
+              </Btn>
+            </section>
+          </>
+        );
+      }
 
       case "limit": return (
         <section className="card">

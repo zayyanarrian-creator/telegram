@@ -1,5 +1,5 @@
 import { redis, isLoggedIn, encrypt, decrypt, tg, maskToken, json, fail } from "@/lib/server";
-import { settingsFrom } from "@/lib/gemini";
+import { settingsFrom, promptOn, DEFAULTS, PROMPT_MAX } from "@/lib/gemini";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -16,7 +16,11 @@ export async function GET() {
     username: c.username || "",
     replyText: s.greeting,
     model: s.model,
-    systemPrompt: s.systemPrompt,
+    systemPrompt: c.systemPrompt != null ? String(c.systemPrompt) : DEFAULTS.systemPrompt,
+    promptOn: promptOn(c),
+    hasPrev: c.prevSystemPrompt != null,
+    defaultPrompt: DEFAULTS.systemPrompt,
+    promptMax: PROMPT_MAX,
     fallbackText: s.fallbackText,
     historyLimit: s.historyLimit,
     limitCount: s.limitCount,
@@ -27,8 +31,23 @@ export async function GET() {
 
 export async function POST(req) {
   if (!(await isLoggedIn())) return fail("Belum masuk.", 401);
-  const { token, replyText, model, systemPrompt, fallbackText, historyLimit, limitCount, limitMinutes, limitText } = await req.json().catch(() => ({}));
+  const { token, replyText, model, systemPrompt, fallbackText, historyLimit, limitCount, limitMinutes, limitText, promptOn: on, promptAction } = await req.json().catch(() => ({}));
   const update = {};
+  const cur = (await redis.hgetall("cfg:bot")) || {};
+  const curPrompt = cur.systemPrompt != null ? String(cur.systemPrompt) : DEFAULTS.systemPrompt;
+
+  if (promptAction === "undo") {
+    if (cur.prevSystemPrompt == null) return fail("Belum ada perubahan yang bisa dibatalkan.");
+    update.systemPrompt = String(cur.prevSystemPrompt);
+    update.prevSystemPrompt = curPrompt;
+  } else if (promptAction === "reset") {
+    update.systemPrompt = DEFAULTS.systemPrompt;
+    update.prevSystemPrompt = curPrompt;
+  } else if (promptAction !== undefined) {
+    return fail("Aksi tidak dikenal.");
+  }
+
+  if (typeof on === "boolean") update.promptOff = on ? "0" : "1";
 
   if (typeof token === "string" && token.trim()) {
     const t = token.trim();
@@ -52,8 +71,9 @@ export async function POST(req) {
   }
 
   if (typeof systemPrompt === "string") {
-    if (systemPrompt.length > 4000) return fail("System prompt maksimal 4000 karakter.");
-    update.systemPrompt = systemPrompt.trim();
+    if (systemPrompt.length > PROMPT_MAX) return fail(`Teks otak maksimal ${PROMPT_MAX} karakter.`);
+    const next = systemPrompt.trim();
+    if (next !== curPrompt) { update.systemPrompt = next; update.prevSystemPrompt = curPrompt; }
   }
 
   if (typeof fallbackText === "string") {
