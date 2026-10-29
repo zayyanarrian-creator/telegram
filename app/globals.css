@@ -340,3 +340,5 @@ ul.keylist { margin: 0 0 22px; display: grid; gap: 10px; }
 .cardhead.tight { margin: 0 0 14px; }
 .kv { margin-bottom: 0; }
 .kv + .field { margin-top: 18px; }
+.kv + .lead { margin-top: 18px; }
+.kv { margin-bottom: 0; }

@@ -399,25 +399,32 @@ function Dash({ onLogout }) {
 
       case "webhook": return (
         <section className="card">
-          <h2>Webhook</h2>
+          <div className="cardhead tight">
+            <div className="cardtitle">
+              <h2>Webhook</h2>
+              {cfg.hasToken && wh && (wh.active ? <span className="badge ok">Aktif</span> : <span className="badge bad">Belum aktif</span>)}
+            </div>
+            {cfg.hasToken && (
+              <Btn className="ghost" busy={busy === "wh-ref"} disabled={anyBusy} onClick={() => run("wh-ref", async () => {}, "Status disegarkan.")}>
+                {busy === "wh-ref" ? "Memuat…" : "Segarkan status"}
+              </Btn>
+            )}
+          </div>
           {!cfg.hasToken ? <p className="muted">Simpan token dulu di menu Token bot.</p> : (
             <>
-              <p>
-                Status:{" "}
-                {wh?.active ? <span className="badge ok">Aktif</span> : <span className="badge bad">Belum aktif</span>}
-                {wh && <span className="muted"> · {wh.pending} pesan menunggu</span>}
-              </p>
-              {wh?.error && <p className="muted">Error terakhir dari Telegram: {wh.error}</p>}
-              <p className="muted">Pasang webhook dari alamat domain utama kamu, bukan dari alamat preview.</p>
+              {wh && (
+                <dl className="kv">
+                  <dt>Pesan menunggu</dt><dd>{wh.pending}</dd>
+                  {wh.error && (<><dt>Error terakhir</dt><dd>{wh.error}</dd></>)}
+                </dl>
+              )}
+              <p className="muted lead">Pasang webhook dari alamat domain utama kamu, bukan dari alamat preview.</p>
               <div className="row">
                 <Btn busy={busy === "wh-set"} disabled={anyBusy} onClick={() => run("wh-set", () => api("/api/admin/webhook", { action: "set" }), "Webhook terpasang.")}>
                   {busy === "wh-set" ? "Memasang…" : "Pasang webhook"}
                 </Btn>
                 <Btn className="ghost danger" busy={busy === "wh-del"} disabled={anyBusy} onClick={() => run("wh-del", () => api("/api/admin/webhook", { action: "delete" }), "Webhook dilepas.")}>
                   {busy === "wh-del" ? "Melepas…" : "Lepas webhook"}
-                </Btn>
-                <Btn className="ghost" busy={busy === "wh-ref"} disabled={anyBusy} onClick={() => run("wh-ref", async () => {}, "Status disegarkan.")}>
-                  {busy === "wh-ref" ? "Memuat…" : "Segarkan status"}
                 </Btn>
               </div>
             </>
