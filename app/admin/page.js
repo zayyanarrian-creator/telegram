@@ -559,8 +559,7 @@ function Dash({ onLogout }) {
                 <label htmlFor="md">Model Gemini</label>
                 <input id="md" list="models" value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} autoComplete="off" />
                 <datalist id="models">
-                  <option value="gemini-3.1-flash-lite" />
-                  <option value="gemini-3.8-flash" />
+                  <option value="gemini-3.5-flash-lite" />
                 </datalist>
                 <p className="muted hint">Kalau tes bilang model tidak ditemukan, cek nama model terbaru di ai.google.dev.</p>
               </div>

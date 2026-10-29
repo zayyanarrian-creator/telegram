@@ -66,7 +66,7 @@ export async function POST(req) {
 
   if (typeof model === "string") {
     const m = model.trim();
-    if (!/^[A-Za-z0-9._-]{3,60}$/.test(m)) return fail("Nama model tidak valid. Contoh: gemini-3.1-flash-lite");
+    if (!/^[A-Za-z0-9._-]{3,60}$/.test(m)) return fail("Nama model tidak valid. Contoh: gemini-3.5-flash-lite");
     update.model = m;
   }
 
