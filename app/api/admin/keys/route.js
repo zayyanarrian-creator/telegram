@@ -1,16 +1,11 @@
 import crypto from "crypto";
 import { redis, isLoggedIn, encrypt, json, fail } from "@/lib/server";
-import { MAX_KEYS, loadKeys, coolStates } from "@/lib/gemini";
+import { MAX_KEYS, loadKeys, keyReport, clearKeyData } from "@/lib/gemini";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (!(await isLoggedIn())) return fail("Belum masuk.", 401);
-  const keys = await loadKeys();
-  const states = await coolStates(keys.map((k) => k.slot));
-  return json({
-    max: MAX_KEYS,
-    keys: keys.map((k, i) => ({ slot: k.slot, mask: k.mask, state: states[i] })),
-  });
+  return json({ max: MAX_KEYS, keys: await keyReport() });
 }
 
 export async function POST(req) {
@@ -51,7 +46,7 @@ export async function POST(req) {
     const n = Number(slot);
     if (!Number.isInteger(n) || n < 1 || n > MAX_KEYS) return fail("Slot tidak valid.");
     await redis.hdel("cfg:keys", String(n));
-    await redis.del(`kcool:${n}`);
+    await clearKeyData(n);
     return json({ ok: true });
   }
 

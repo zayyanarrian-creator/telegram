@@ -19,12 +19,15 @@ export async function GET() {
     systemPrompt: s.systemPrompt,
     fallbackText: s.fallbackText,
     historyLimit: s.historyLimit,
+    limitCount: s.limitCount,
+    limitMinutes: s.limitMinutes,
+    limitText: s.limitText,
   });
 }
 
 export async function POST(req) {
   if (!(await isLoggedIn())) return fail("Belum masuk.", 401);
-  const { token, replyText, model, systemPrompt, fallbackText, historyLimit } = await req.json().catch(() => ({}));
+  const { token, replyText, model, systemPrompt, fallbackText, historyLimit, limitCount, limitMinutes, limitText } = await req.json().catch(() => ({}));
   const update = {};
 
   if (typeof token === "string" && token.trim()) {
@@ -64,6 +67,25 @@ export async function POST(req) {
     const n = Number(historyLimit);
     if (!Number.isInteger(n) || n < 0 || n > 20) return fail("Riwayat chat harus angka bulat 0 sampai 20.");
     update.historyLimit = n;
+  }
+
+  if (limitCount !== undefined) {
+    const n = Number(limitCount);
+    if (!Number.isInteger(n) || n < 0 || n > 1000) return fail("Batas pesan harus angka bulat 0 sampai 1000 (0 = tanpa batas).");
+    update.limitCount = n;
+  }
+
+  if (limitMinutes !== undefined) {
+    const n = Number(limitMinutes);
+    if (!Number.isInteger(n) || n < 1 || n > 1440) return fail("Jendela waktu harus 1 sampai 1440 menit.");
+    update.limitMinutes = n;
+  }
+
+  if (typeof limitText === "string") {
+    const t = limitText.trim();
+    if (!t) return fail("Pesan batas tidak boleh kosong.");
+    if (t.length > 500) return fail("Pesan batas maksimal 500 karakter.");
+    update.limitText = t;
   }
 
   if (!Object.keys(update).length) return fail("Tidak ada yang disimpan.");

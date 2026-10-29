@@ -79,10 +79,32 @@ function Auth({ mode, needsCode, onDone }) {
   );
 }
 
-const KEY_STATE = {
-  rate: "Kena batas, istirahat sebentar",
-  bad: "Ditolak Google",
-};
+const LOG_ST = { ok: "Dibalas", error: "Gagal", limited: "Kena batas" };
+
+function fmtDur(sec) {
+  if (sec < 90) return `${Math.max(1, Math.round(sec))} detik`;
+  if (sec < 5400) return `${Math.round(sec / 60)} menit`;
+  return `${Math.round(sec / 3600)} jam`;
+}
+
+function ago(ts) {
+  if (!ts) return "belum pernah";
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 60) return "baru saja";
+  return fmtDur(s) + " lalu";
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleString("id-ID", {
+    timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function keyLabel(k) {
+  if (k.state === "rate") return `Kena batas, siap lagi ±${fmtDur(k.coolSec || 60)}`;
+  if (k.state === "bad") return `Ditolak Google, dicoba lagi ±${fmtDur(k.coolSec || 3600)}`;
+  return "Siap";
+}
 
 function Dash({ onLogout }) {
   const [cfg, setCfg] = useState(null);
@@ -91,6 +113,8 @@ function Dash({ onLogout }) {
   const [token, setToken] = useState("");
   const [reply, setReply] = useState("");
   const [ai, setAi] = useState({ model: "", systemPrompt: "", fallbackText: "", historyLimit: 10 });
+  const [lim, setLim] = useState({ limitCount: 20, limitMinutes: 60, limitText: "" });
+  const [logs, setLogs] = useState(null);
   const [newKey, setNewKey] = useState("");
   const [testMsg, setTestMsg] = useState("Halo, kamu siapa?");
   const [testOut, setTestOut] = useState(null);
@@ -102,7 +126,9 @@ function Dash({ onLogout }) {
     const c = await api("/api/admin/settings");
     setCfg(c); setReply(c.replyText);
     setAi({ model: c.model, systemPrompt: c.systemPrompt, fallbackText: c.fallbackText, historyLimit: c.historyLimit });
+    setLim({ limitCount: c.limitCount, limitMinutes: c.limitMinutes, limitText: c.limitText });
     setKeys(await api("/api/admin/keys"));
+    setLogs((await api("/api/admin/logs").catch(() => ({ logs: [] }))).logs);
     if (c.hasToken) setWh(await api("/api/admin/webhook", { action: "status" }).catch(() => null));
     else setWh(null);
   }
@@ -181,12 +207,18 @@ function Dash({ onLogout }) {
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 14px" }}>
             {keys.keys.map((k) => (
-              <li key={k.slot} className="row" style={{ justifyContent: "space-between", margin: "0 0 8px" }}>
-                <span>
-                  <code>#{k.slot} {k.mask}</code>{" "}
-                  <span className={"badge " + (k.state ? "bad" : "ok")}>{KEY_STATE[k.state] || "Siap"}</span>
-                </span>
-                <button className="btn ghost" onClick={() => run(() => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>Hapus</button>
+              <li key={k.slot} className="keyitem">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <span>
+                    <code>#{k.slot} {k.mask}</code>{" "}
+                    <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
+                  </span>
+                  <button className="btn ghost" onClick={() => run(() => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>Hapus</button>
+                </div>
+                <p className="muted small">
+                  Berhasil {k.ok} · Gagal {k.fail} · Hari ini {k.today} permintaan (WIB) · Terakhir dipakai {ago(k.last)}
+                </p>
+                {k.err && <p className="muted small">Error terakhir ({ago(k.errAt)}): {k.err}</p>}
               </li>
             ))}
           </ul>
@@ -246,6 +278,70 @@ function Dash({ onLogout }) {
           }), "Pengaturan AI disimpan.")}>
           Simpan pengaturan AI
         </button>
+      </section>
+
+      <section className="card">
+        <h2>Batas pesan per pengguna</h2>
+        <p className="muted">
+          Membatasi berapa pesan yang boleh dikirim satu pengguna dalam rentang waktu tertentu, supaya kuota key tidak habis oleh satu orang.
+          Perintah /start dan /reset tidak dihitung. Isi 0 pada jumlah pesan untuk mematikan batas.
+        </p>
+        <div className="row">
+          <div className="field" style={{ flex: 1, minWidth: 140 }}>
+            <label htmlFor="lc">Jumlah pesan</label>
+            <input id="lc" type="number" min={0} max={1000} value={lim.limitCount}
+              onChange={(e) => setLim({ ...lim, limitCount: e.target.value })} />
+          </div>
+          <div className="field" style={{ flex: 1, minWidth: 140 }}>
+            <label htmlFor="lm">Per berapa menit</label>
+            <input id="lm" type="number" min={1} max={1440} value={lim.limitMinutes}
+              onChange={(e) => setLim({ ...lim, limitMinutes: e.target.value })} />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="lt">Pesan saat batas tercapai</label>
+          <textarea id="lt" style={{ minHeight: 70 }} value={lim.limitText} maxLength={500}
+            onChange={(e) => setLim({ ...lim, limitText: e.target.value })} />
+          <p className="muted" style={{ margin: "6px 0 0" }}><code>{"{sisa}"}</code> diganti sisa waktu tunggu dalam menit. Pesan ini dikirim sekali per rentang waktu, pesan berikutnya dari orang yang sama diabaikan tanpa balasan.</p>
+        </div>
+        <button className="btn"
+          onClick={() => run(() => api("/api/admin/settings", {
+            limitCount: Number(lim.limitCount), limitMinutes: Number(lim.limitMinutes), limitText: lim.limitText,
+          }), "Batas pesan disimpan.")}>
+          Simpan batas pesan
+        </button>
+      </section>
+
+      <section className="card">
+        <h2>Log pesan</h2>
+        <p className="muted">
+          50 pesan terakhir (maksimal 200 tersimpan, tiap pesan dipotong 300 karakter, hilang otomatis 30 hari setelah pesan terakhir).
+          Log berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
+        </p>
+        <div className="row" style={{ marginBottom: 14 }}>
+          <button className="btn ghost" onClick={() => load().catch((e) => note(e.message, true))}>Segarkan</button>
+          <button className="btn ghost" disabled={!logs?.length}
+            onClick={() => { if (confirm("Hapus semua log pesan?")) run(() => api("/api/admin/logs", { action: "clear" }), "Log dihapus."); }}>
+            Hapus semua log
+          </button>
+        </div>
+        {!logs?.length ? <p className="muted">Belum ada pesan.</p> : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {logs.map((l, i) => (
+              <li key={l.t + "-" + i} className="logitem">
+                <div className="row small muted">
+                  <span>{fmtTime(l.t)}</span>
+                  <span>{l.name}</span>
+                  <span className={"badge " + (l.st === "ok" ? "ok" : "bad")}>{LOG_ST[l.st] || l.st}</span>
+                  {l.slot && <span>key #{l.slot}</span>}
+                  {l.ms != null && <span>{(l.ms / 1000).toFixed(1)} dtk</span>}
+                </div>
+                <div className="logtext"><b>Tanya:</b> {l.q}</div>
+                <div className="logtext muted"><b>{l.st === "ok" ? "Jawab" : "Keterangan"}:</b> {l.a}</div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card">
