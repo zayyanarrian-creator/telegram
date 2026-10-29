@@ -1,6 +1,7 @@
 import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
 import { addLog, addConv, checkLimit } from "@/lib/activity";
+import { decorate } from "@/lib/buttons";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -66,9 +67,15 @@ export async function POST(req) {
         String(uid);
       // Nama percakapan: judul grup, atau nama pengirim untuk chat pribadi.
       const title = msg.chat.title || who;
-      const send = async (text) => {
-        for (const part of splitText(text)) await tg(botToken, "sendMessage", { chat_id: chatId, text: part });
-        await addConv({ chatId, title, role: "bot", name: "Bot", text });
+      // buttons = [{ text, url }] ditampilkan di bawah pesan terakhir; logText = teks asli untuk riwayat/admin.
+      const send = async (text, buttons = [], logText = text) => {
+        const parts = splitText(text);
+        for (let i = 0; i < parts.length; i++) {
+          const body = { chat_id: chatId, text: parts[i], link_preview_options: { is_disabled: true } };
+          if (buttons.length && i === parts.length - 1) body.reply_markup = { inline_keyboard: buttons.map((b) => [b]) };
+          await tg(botToken, "sendMessage", body);
+        }
+        await addConv({ chatId, title, role: "bot", name: "Bot", text: logText });
       };
       // Untuk foto, teksnya adalah caption (boleh kosong).
       const caption = (msg.text || msg.caption || "").trim().slice(0, 4000);
@@ -115,7 +122,8 @@ export async function POST(req) {
           }
           const r = await generateReply({ text: askText, history, settings: s, images });
           if (r.ok) {
-            await send(r.text);
+            const d = decorate(r.text);
+            await send(d.text, d.buttons, r.text);
             await saveTurn(chatId, text, r.text, s.historyLimit);
             await addLog({ uid, name: who, q: text, a: r.text, st: "ok", slot: r.slot, ms: Date.now() - t0 });
           } else {
