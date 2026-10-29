@@ -57,23 +57,24 @@ function Auth({ mode, needsCode, onDone }) {
   }
 
   return (
-    <div className="card" style={{ maxWidth: 420, margin: "10vh auto 0" }}>
-      <h1 style={{ fontSize: "1.6rem" }}>{setup ? "Buat password admin" : "Masuk admin"}</h1>
-      {setup && <p className="muted">Ini pertama kali halaman dibuka. Password disimpan dalam bentuk hash.</p>}
+    <div className="card authcard">
+      <span className="logo"><Icon name="bot" size={22} /></span>
+      <h1>{setup ? "Buat password admin" : "Masuk admin"}</h1>
+      <p className="muted">{setup ? "Ini pertama kali halaman dibuka. Password disimpan dalam bentuk hash." : "Masukkan password untuk membuka panel admin bot."}</p>
       {err && <div className="msg bad">{err}</div>}
       <form onSubmit={submit}>
         {setup && needsCode && (
           <div className="field">
             <label htmlFor="code">Kode setup</label>
-            <input id="code" type="password" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" />
+            <SecretInput id="code" value={code} onChange={(e) => setCode(e.target.value)} />
           </div>
         )}
         <div className="field">
           <label htmlFor="pw">Password</label>
-          <input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            autoComplete={setup ? "new-password" : "current-password"} />
+          <SecretInput id="pw" value={password} onChange={(e) => setPassword(e.target.value)}
+            autoComplete={setup ? "new-password" : "current-password"} autoFocus />
         </div>
-        <Btn busy={busy}>{busy ? "Memproses…" : setup ? "Buat password" : "Masuk"}</Btn>
+        <Btn className="block" busy={busy}>{busy ? "Memproses…" : setup ? "Buat password" : "Masuk"}</Btn>
       </form>
     </div>
   );
@@ -136,6 +137,12 @@ const ICONS = {
   list: <><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></>,
   edit: <><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" /><path d="m13.5 6.5 4 4" /></>,
   bot: <><rect x="4" y="8" width="16" height="12" rx="3" /><path d="M12 8V4m-2-1h4M9 14h.01M15 14h.01M2 14h2m16 0h2" /></>,
+  eye: <><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
+  eyeoff: <><path d="M10.7 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.4-1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" /></>,
+  refresh: <><path d="M20 11a8 8 0 0 0-14.5-3.5L4 9m0-5v5h5" /><path d="M4 13a8 8 0 0 0 14.5 3.5L20 15m0 5v-5h-5" /></>,
+  trash: <><path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  back: <path d="M15 5l-7 7 7 7" />,
   logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></>,
 };
 
@@ -146,6 +153,22 @@ function Icon({ name, size = 18 }) {
   );
 }
 
+
+// Kolom rahasia (password, token, API key) dengan tombol ikon mata untuk tampil/sembunyikan.
+function SecretInput({ id, value, onChange, placeholder, autoComplete = "off", autoFocus }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="pw">
+      <input id={id} type={show ? "text" : "password"} value={value} onChange={onChange}
+        placeholder={placeholder} autoComplete={autoComplete} autoFocus={autoFocus}
+        spellCheck={false} autoCapitalize="off" autoCorrect="off" />
+      <button type="button" className="eye" onClick={() => setShow((v) => !v)}
+        aria-label={show ? "Sembunyikan" : "Tampilkan"} aria-pressed={show} title={show ? "Sembunyikan" : "Tampilkan"}>
+        <Icon name={show ? "eyeoff" : "eye"} size={18} />
+      </button>
+    </div>
+  );
+}
 
 /* ---------- Percakapan Telegram: daftar di kiri, isi di kanan ---------- */
 function Convs({ note }) {
@@ -184,13 +207,13 @@ function Convs({ note }) {
   return (
     <section className="card">
       <h2>Percakapan Telegram</h2>
-      <p className="muted">
+      <p className="muted lead">
         Semua chat yang masuk ke bot, lengkap dengan balasannya. Maksimal 500 percakapan dan 200 pesan per percakapan,
         hilang otomatis 30 hari setelah pesan terakhir. Berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
       </p>
-      <div className="row" style={{ marginBottom: 14 }}>
-        <button className="btn ghost" onClick={() => { loadList(); if (sel) open(sel); }}>Segarkan</button>
-        <button className="btn ghost" disabled={!chats.length} onClick={removeAll}>Hapus semua</button>
+      <div className="toolbar">
+        <button className="btn ghost" onClick={() => { loadList(); if (sel) open(sel); }}><Icon name="refresh" size={16} /><span>Segarkan</span></button>
+        <button className="btn ghost danger" disabled={!chats.length} onClick={removeAll}><Icon name="trash" size={16} /><span>Hapus semua</span></button>
         <input className="convsearch" type="search" placeholder="Cari nama…" aria-label="Cari percakapan"
           value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
@@ -211,9 +234,9 @@ function Convs({ note }) {
             {!sel ? <p className="muted">Pilih percakapan di sebelah kiri.</p> : (
               <>
                 <div className="threadhead">
-                  <button className="btn ghost back" onClick={() => { setSel(null); setConv(null); }}>Kembali</button>
+                  <button className="btn ghost back" onClick={() => { setSel(null); setConv(null); }}><Icon name="back" size={16} /><span>Kembali</span></button>
                   <b>{conv?.title || "…"}</b>
-                  <button className="btn ghost" onClick={() => remove(sel)}>Hapus</button>
+                  <button className="btn ghost danger" onClick={() => remove(sel)}><Icon name="trash" size={16} /><span>Hapus</span></button>
                 </div>
                 <div className="msgs" role="log" aria-label="Isi percakapan">
                   {loading && !conv ? <Loader /> : conv?.messages?.length ? conv.messages.map((m, i) => (
@@ -347,7 +370,7 @@ function Dash({ onLogout }) {
             <>
               <div className="field">
                 <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>
-                <input id="tk" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="123456789:AA…" autoFocus={editToken} />
+                <SecretInput id="tk" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" autoFocus={editToken} />
               </div>
               <div className="row">
                 <Btn busy={busy === "token"} disabled={!token.trim() || anyBusy}
@@ -379,7 +402,7 @@ function Dash({ onLogout }) {
                 <Btn busy={busy === "wh-set"} disabled={anyBusy} onClick={() => run("wh-set", () => api("/api/admin/webhook", { action: "set" }), "Webhook terpasang.")}>
                   {busy === "wh-set" ? "Memasang…" : "Pasang webhook"}
                 </Btn>
-                <Btn className="ghost" busy={busy === "wh-del"} disabled={anyBusy} onClick={() => run("wh-del", () => api("/api/admin/webhook", { action: "delete" }), "Webhook dilepas.")}>
+                <Btn className="ghost danger" busy={busy === "wh-del"} disabled={anyBusy} onClick={() => run("wh-del", () => api("/api/admin/webhook", { action: "delete" }), "Webhook dilepas.")}>
                   {busy === "wh-del" ? "Melepas…" : "Lepas webhook"}
                 </Btn>
                 <Btn className="ghost" busy={busy === "wh-ref"} disabled={anyBusy} onClick={() => run("wh-ref", async () => {}, "Status disegarkan.")}>
@@ -402,14 +425,14 @@ function Dash({ onLogout }) {
         return (
           <section className="card">
             <h2>Kunci API Gemini</h2>
-            <p className="muted">
+            <p className="muted lead">
               Maksimal {keys.max} key. Bot memakai key bergantian, dan kalau satu key kena batas atau ditolak, otomatis pindah ke key berikutnya.
               Batas pemakaian dihitung per proyek Google, jadi buat tiap key di proyek yang berbeda di Google AI Studio supaya kuotanya terpisah.
             </p>
             {keys.keys.length === 0 ? (
               <p className="muted">Belum ada key.</p>
             ) : (
-              <ul className="plain" style={{ margin: "0 0 14px" }}>
+              <ul className="plain keylist">
                 {keys.keys.map((k) => (
                   <li key={k.slot} className="keyitem">
                     {editSlot === k.slot ? (
@@ -423,21 +446,21 @@ function Dash({ onLogout }) {
                         <Btn className="ghost" disabled={anyBusy} onClick={() => setEditSlot(null)}>Batal</Btn>
                       </div>
                     ) : (
-                      <div className="row" style={{ justifyContent: "space-between" }}>
-                        <span>
-                          <b>{k.name || "Key #" + k.slot}</b>{" "}
-                          <code>{k.mask}</code>{" "}
+                      <div className="keyrow">
+                        <div className="keyinfo">
+                          <b>{k.name || "Key #" + k.slot}</b>
+                          <code>{k.mask}</code>
                           <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
-                        </span>
-                        <span className="row">
+                        </div>
+                        <div className="row">
                           <Btn className="ghost" disabled={anyBusy} onClick={() => { setEditSlot(k.slot); setEditName(k.name || ""); }}>
                             <Icon name="edit" size={16} />Edit
                           </Btn>
-                          <Btn className="ghost" busy={busy === "del-" + k.slot} disabled={anyBusy}
+                          <Btn className="ghost danger" busy={busy === "del-" + k.slot} disabled={anyBusy}
                             onClick={() => run("del-" + k.slot, () => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>
                             {busy === "del-" + k.slot ? "Menghapus…" : "Hapus"}
                           </Btn>
-                        </span>
+                        </div>
                       </div>
                     )}
                     <p className="muted small">
@@ -456,7 +479,7 @@ function Dash({ onLogout }) {
                 </div>
                 <div className="field">
                   <label htmlFor="gk">API key</label>
-                  <input id="gk" type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} autoComplete="off" placeholder="AIza…" />
+                  <SecretInput id="gk" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="AIza…" />
                 </div>
                 <div className="row">
                   <Btn busy={busy === "key-add"} disabled={!newKey.trim() || anyBusy}
@@ -478,11 +501,11 @@ function Dash({ onLogout }) {
         return (
           <>
             <section className="card">
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div className="cardhead">
                 <h2>Otak asisten</h2>
                 <span className={"pill " + (cfg.promptOn ? "ok" : "off")}>{cfg.promptOn ? "Aktif" : "Mati"}</span>
               </div>
-              <p className="muted">
+              <p className="muted lead">
                 Instruksi tetap untuk AI: peran, info bisnis, gaya bahasa, dan batasan topik. Teks ini dikirim ke Gemini di setiap balasan.
               </p>
               <label className="check">
@@ -548,17 +571,17 @@ function Dash({ onLogout }) {
       case "limit": return (
         <section className="card">
           <h2>Batas pesan per pengguna</h2>
-          <p className="muted">
+          <p className="muted lead">
             Membatasi berapa pesan yang boleh dikirim satu pengguna dalam rentang waktu tertentu, supaya kuota key tidak habis oleh satu orang.
             Perintah /start dan /reset tidak dihitung. Isi 0 pada jumlah pesan untuk mematikan batas.
           </p>
-          <div className="row">
-            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+          <div className="grid2">
+            <div className="field">
               <label htmlFor="lc">Jumlah pesan</label>
               <input id="lc" type="number" min={0} max={1000} value={lim.limitCount}
                 onChange={(e) => setLim({ ...lim, limitCount: e.target.value })} />
             </div>
-            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+            <div className="field">
               <label htmlFor="lm">Per berapa menit</label>
               <input id="lm" type="number" min={1} max={1440} value={lim.limitMinutes}
                 onChange={(e) => setLim({ ...lim, limitMinutes: e.target.value })} />
@@ -584,15 +607,15 @@ function Dash({ onLogout }) {
       case "logs": return (
         <section className="card">
           <h2>Log pesan</h2>
-          <p className="muted">
+          <p className="muted lead">
             50 pesan terakhir (maksimal 200 tersimpan, tiap pesan dipotong 300 karakter, hilang otomatis 30 hari setelah pesan terakhir).
             Log berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
           </p>
-          <div className="row" style={{ marginBottom: 14 }}>
+          <div className="toolbar">
             <Btn className="ghost" busy={busy === "log-ref"} disabled={anyBusy} onClick={() => run("log-ref", async () => {}, "Log disegarkan.")}>
               {busy === "log-ref" ? "Memuat…" : "Segarkan"}
             </Btn>
-            <Btn className="ghost" busy={busy === "log-clear"} disabled={!logs?.length || anyBusy}
+            <Btn className="ghost danger" busy={busy === "log-clear"} disabled={!logs?.length || anyBusy}
               onClick={() => { if (confirm("Hapus semua log pesan?")) run("log-clear", () => api("/api/admin/logs", { action: "clear" }), "Log dihapus."); }}>
               {busy === "log-clear" ? "Menghapus…" : "Hapus semua log"}
             </Btn>
@@ -620,7 +643,7 @@ function Dash({ onLogout }) {
       case "test": return (
         <section className="card">
           <h2>Tes balasan</h2>
-          <p className="muted">Mencoba Gemini langsung dari sini, tanpa lewat Telegram. Tes tidak memakai riwayat chat.</p>
+          <p className="muted lead">Mencoba Gemini langsung dari sini, tanpa lewat Telegram. Tes tidak memakai riwayat chat.</p>
           <div className="field">
             <label htmlFor="tm">Pesan uji coba</label>
             <input id="tm" value={testMsg} onChange={(e) => setTestMsg(e.target.value)} maxLength={2000} />
@@ -629,7 +652,7 @@ function Dash({ onLogout }) {
             {busy === "test" ? "Menunggu jawaban…" : "Kirim tes"}
           </Btn>
           {testOut && (
-            <div className={"msg " + (testOut.bad ? "bad" : "ok")} style={{ marginTop: 14, whiteSpace: "pre-wrap" }}>{testOut.text}</div>
+            <div className={"msg testout " + (testOut.bad ? "bad" : "ok")}>{testOut.text}</div>
           )}
         </section>
       );
