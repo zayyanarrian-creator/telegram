@@ -358,9 +358,16 @@ function Dash({ onLogout }) {
     switch (page) {
       case "token": return (
         <section className="card">
-          <div className="cardhead">
-            <h2>Token bot</h2>
-            {cfg.hasToken && <span className="badge ok">Terhubung</span>}
+          <div className="cardhead tight">
+            <div className="cardtitle">
+              <h2>Token bot</h2>
+              {cfg.hasToken && <span className="badge ok">Terhubung</span>}
+            </div>
+            {cfg.hasToken && !editToken && (
+              <Btn className="ghost" disabled={anyBusy} onClick={() => setEditToken(true)}>
+                <Icon name="edit" size={16} />Edit token
+              </Btn>
+            )}
           </div>
           {cfg.hasToken ? (
             <dl className="kv">
@@ -370,11 +377,7 @@ function Dash({ onLogout }) {
           ) : (
             <p className="muted">Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini.</p>
           )}
-          {cfg.hasToken && !editToken ? (
-            <Btn className="ghost" disabled={anyBusy} onClick={() => setEditToken(true)}>
-              <Icon name="edit" size={16} />Edit token
-            </Btn>
-          ) : (
+          {cfg.hasToken && !editToken ? null : (
             <>
               <div className="field">
                 <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>

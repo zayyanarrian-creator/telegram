@@ -335,3 +335,8 @@ ul.keylist { margin: 0 0 22px; display: grid; gap: 10px; }
 .kv dt { color: var(--mute); font-size: .9rem; }
 .kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .kv dd code { font-weight: 500; }
+.cardtitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.cardtitle h2 { margin: 0; }
+.cardhead.tight { margin: 0 0 14px; }
+.kv { margin-bottom: 0; }
+.kv + .field { margin-top: 18px; }
