@@ -67,7 +67,7 @@ ol.steps { padding-left: 1.2em; } ol.steps li { margin: 0 0 .5em; }
 .navitem:hover { background: var(--bg); }
 .navitem.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; }
 .navitem:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-.navitem .ico { width: 1.4em; text-align: center; }
+.navitem .ico { flex: none; }
 .navitem.logout { margin-top: auto; color: var(--bad); border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; padding-top: 14px; }
 .content { flex: 1; min-width: 0; max-width: 860px; padding: 28px 28px 64px; margin: 0 auto; }
 .topbar { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; }

@@ -125,20 +125,40 @@ function Loader({ text = "Memuat…" }) {
   );
 }
 
+const ICONS = {
+  key: <><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 20 3m-4 4 3 3m-6-1 2 2" /></>,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+  keys: <><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+  sliders: <><path d="M4 6h10m4 0h2M4 12h4m4 0h8M4 18h12m4 0h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
+  flask: <><path d="M9 3h6M10 3v6L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9V3" /><path d="M7.5 15h9" /></>,
+  chat: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  list: <><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></>,
+  bot: <><rect x="4" y="8" width="16" height="12" rx="3" /><path d="M12 8V4m-2-1h4M9 14h.01M15 14h.01M2 14h2m16 0h2" /></>,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></>,
+};
+
+function Icon({ name, size = 18 }) {
+  return (
+    <svg className="ico" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>
+  );
+}
+
 const MENU = [
   { group: "Bot", items: [
-    { id: "token", label: "Token bot", icon: "🔑" },
-    { id: "webhook", label: "Webhook", icon: "🔗" },
+    { id: "token", label: "Token bot", icon: "key" },
+    { id: "webhook", label: "Webhook", icon: "link" },
   ] },
   { group: "AI", items: [
-    { id: "keys", label: "Kunci API Gemini", icon: "🗝️" },
-    { id: "ai", label: "Perilaku AI", icon: "🧠" },
-    { id: "test", label: "Tes balasan", icon: "🧪" },
+    { id: "keys", label: "Kunci API Gemini", icon: "keys" },
+    { id: "ai", label: "Perilaku AI", icon: "sliders" },
+    { id: "test", label: "Tes balasan", icon: "flask" },
   ] },
   { group: "Pengguna", items: [
-    { id: "welcome", label: "Pesan sambutan", icon: "👋" },
-    { id: "limit", label: "Batas pesan", icon: "⏱️" },
-    { id: "logs", label: "Log pesan", icon: "📜" },
+    { id: "welcome", label: "Pesan sambutan", icon: "chat" },
+    { id: "limit", label: "Batas pesan", icon: "clock" },
+    { id: "logs", label: "Log pesan", icon: "list" },
   ] },
 ];
 const ALL = MENU.flatMap((g) => g.items);
@@ -470,7 +490,7 @@ function Dash({ onLogout }) {
 
       <aside className={"side" + (navOpen ? " open" : "")}>
         <div className="brand">
-          <span className="logo">🤖</span>
+          <span className="logo"><Icon name="bot" size={22} /></span>
           <div>
             <b>Admin bot</b>
             {cfg?.username && <div className="muted small">@{cfg.username}</div>}
@@ -483,13 +503,13 @@ function Dash({ onLogout }) {
               {g.items.map((m) => (
                 <button key={m.id} className={"navitem" + (page === m.id ? " active" : "")}
                   aria-current={page === m.id ? "page" : undefined} onClick={() => go(m.id)}>
-                  <span className="ico" aria-hidden="true">{m.icon}</span>{m.label}
+                  <Icon name={m.icon} />{m.label}
                 </button>
               ))}
             </div>
           ))}
         </nav>
-        <button className="navitem logout" onClick={onLogout}><span className="ico" aria-hidden="true">🚪</span>Keluar</button>
+        <button className="navitem logout" onClick={onLogout}><Icon name="logout" />Keluar</button>
       </aside>
 
       <div className="content">
