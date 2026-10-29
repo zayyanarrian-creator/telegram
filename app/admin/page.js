@@ -234,6 +234,9 @@ function Convs({ note }) {
 }
 
 const MENU = [
+  { group: "Chat", items: [
+    { id: "convs", label: "Percakapan", icon: "chat" },
+  ] },
   { group: "Bot", items: [
     { id: "token", label: "Token bot", icon: "key" },
     { id: "webhook", label: "Webhook", icon: "link" },
@@ -244,7 +247,6 @@ const MENU = [
     { id: "test", label: "Tes balasan", icon: "flask" },
   ] },
   { group: "Pengguna", items: [
-    { id: "convs", label: "Percakapan", icon: "chat" },
     { id: "welcome", label: "Pesan sambutan", icon: "chat" },
     { id: "limit", label: "Batas pesan", icon: "clock" },
     { id: "logs", label: "Log pesan", icon: "list" },
@@ -270,7 +272,7 @@ function Dash({ onLogout }) {
   const [testOut, setTestOut] = useState(null);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(null); // id aksi yang sedang berjalan
-  const [page, setPage] = useState("token");
+  const [page, setPage] = useState("convs");
   const [navOpen, setNavOpen] = useState(false);
   const note = (text, bad) => setMsg({ text, bad });
 
