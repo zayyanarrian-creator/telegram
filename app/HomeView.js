@@ -41,7 +41,7 @@ export default function HomeView({ link }) {
   return (
     <>
       <header className="topnav">
-        <a href="https://emahairshop.com" target="_blank" rel="noopener noreferrer" aria-label="EMAHAIRSHOP">
+        <a href="/" aria-label="EMAHAIRSHOP">
           <div className="logo-nav-container">
             <div className="logo-top"><span className="line-top"></span><span className="text-ext">EXTENSION</span></div>
             <div className="logo-main">EMAHAIRSHOP</div>
