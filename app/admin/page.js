@@ -360,7 +360,7 @@ function Dash({ onLogout }) {
         <section className="card">
           <h2>Token bot</h2>
           <p className="muted">
-            {cfg.hasToken ? <>Tersimpan: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
+            {cfg.hasToken ? <>Terhubung: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
           </p>
           {cfg.hasToken && !editToken ? (
             <Btn className="ghost" disabled={anyBusy} onClick={() => setEditToken(true)}>
