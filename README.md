@@ -91,6 +91,7 @@ Semuanya opsional. Token bot dan API key diisi lewat `/admin`, bukan lewat varia
 
 | Variabel | Fungsi |
 | --- | --- |
+| `ADMIN_PATH` | Alamat rahasia halaman admin (misal `k7x-panel-93qz`). Kalau diisi, admin hanya bisa dibuka di `/k7x-panel-93qz` dan `/admin` menampilkan 404. Kosong = tetap `/admin`. |
 | `SETUP_CODE` | Kode sekali pakai agar hanya kamu yang bisa membuat password admin pertama kali. |
 | `APP_SECRET` | Kunci enkripsi token dan API key. Kalau kosong, dibuat otomatis dan disimpan di Redis. Kalau diisi, **jangan diubah** setelah ada token atau key tersimpan, karena data lama tidak akan bisa dibaca lagi. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Terisi otomatis oleh integrasi Upstash. Nama `KV_REST_API_URL` dan `KV_REST_API_TOKEN` (serta yang berawalan) juga dikenali. |
