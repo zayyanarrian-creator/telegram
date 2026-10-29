@@ -134,6 +134,7 @@ const ICONS = {
   chat: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   list: <><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></>,
+  edit: <><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" /><path d="m13.5 6.5 4 4" /></>,
   bot: <><rect x="4" y="8" width="16" height="12" rx="3" /><path d="M12 8V4m-2-1h4M9 14h.01M15 14h.01M2 14h2m16 0h2" /></>,
   logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></>,
 };
@@ -173,6 +174,10 @@ function Dash({ onLogout }) {
   const [lim, setLim] = useState({ limitCount: 20, limitMinutes: 60, limitText: "" });
   const [logs, setLogs] = useState(null);
   const [newKey, setNewKey] = useState("");
+  const [newKeyName, setNewKeyName] = useState("");
+  const [editToken, setEditToken] = useState(false);
+  const [editSlot, setEditSlot] = useState(null);
+  const [editName, setEditName] = useState("");
   const [testMsg, setTestMsg] = useState("Halo, kamu siapa?");
   const [testOut, setTestOut] = useState(null);
   const [msg, setMsg] = useState(null);
@@ -244,14 +249,27 @@ function Dash({ onLogout }) {
           <p className="muted">
             {cfg.hasToken ? <>Tersimpan: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
           </p>
-          <div className="field">
-            <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>
-            <input id="tk" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="123456789:AA…" />
-          </div>
-          <Btn busy={busy === "token"} disabled={!token.trim() || anyBusy}
-            onClick={() => run("token", async () => { await api("/api/admin/settings", { token }); setToken(""); }, "Token disimpan.")}>
-            {busy === "token" ? "Menyimpan…" : "Simpan token"}
-          </Btn>
+          {cfg.hasToken && !editToken ? (
+            <Btn className="ghost" disabled={anyBusy} onClick={() => setEditToken(true)}>
+              <Icon name="edit" size={16} />Edit token
+            </Btn>
+          ) : (
+            <>
+              <div className="field">
+                <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>
+                <input id="tk" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="123456789:AA…" autoFocus={editToken} />
+              </div>
+              <div className="row">
+                <Btn busy={busy === "token"} disabled={!token.trim() || anyBusy}
+                  onClick={() => run("token", async () => { await api("/api/admin/settings", { token }); setToken(""); setEditToken(false); }, "Token disimpan.")}>
+                  {busy === "token" ? "Menyimpan…" : "Simpan token"}
+                </Btn>
+                {cfg.hasToken && (
+                  <Btn className="ghost" disabled={anyBusy} onClick={() => { setEditToken(false); setToken(""); }}>Batal</Btn>
+                )}
+              </div>
+            </>
+          )}
         </section>
       );
 
@@ -304,16 +322,34 @@ function Dash({ onLogout }) {
               <ul className="plain" style={{ margin: "0 0 14px" }}>
                 {keys.keys.map((k) => (
                   <li key={k.slot} className="keyitem">
-                    <div className="row" style={{ justifyContent: "space-between" }}>
-                      <span>
-                        <code>#{k.slot} {k.mask}</code>{" "}
-                        <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
-                      </span>
-                      <Btn className="ghost" busy={busy === "del-" + k.slot} disabled={anyBusy}
-                        onClick={() => run("del-" + k.slot, () => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>
-                        {busy === "del-" + k.slot ? "Menghapus…" : "Hapus"}
-                      </Btn>
-                    </div>
+                    {editSlot === k.slot ? (
+                      <div className="row">
+                        <input aria-label="Nama key" style={{ flex: 1, minWidth: 160 }} value={editName} maxLength={40} autoFocus
+                          placeholder={"Key #" + k.slot} onChange={(e) => setEditName(e.target.value)} />
+                        <Btn busy={busy === "ren-" + k.slot} disabled={anyBusy}
+                          onClick={() => run("ren-" + k.slot, async () => { await api("/api/admin/keys", { action: "rename", slot: k.slot, name: editName }); setEditSlot(null); }, "Nama key disimpan.")}>
+                          {busy === "ren-" + k.slot ? "Menyimpan…" : "Simpan"}
+                        </Btn>
+                        <Btn className="ghost" disabled={anyBusy} onClick={() => setEditSlot(null)}>Batal</Btn>
+                      </div>
+                    ) : (
+                      <div className="row" style={{ justifyContent: "space-between" }}>
+                        <span>
+                          <b>{k.name || "Key #" + k.slot}</b>{" "}
+                          <code>{k.mask}</code>{" "}
+                          <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
+                        </span>
+                        <span className="row">
+                          <Btn className="ghost" disabled={anyBusy} onClick={() => { setEditSlot(k.slot); setEditName(k.name || ""); }}>
+                            <Icon name="edit" size={16} />Edit
+                          </Btn>
+                          <Btn className="ghost" busy={busy === "del-" + k.slot} disabled={anyBusy}
+                            onClick={() => run("del-" + k.slot, () => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>
+                            {busy === "del-" + k.slot ? "Menghapus…" : "Hapus"}
+                          </Btn>
+                        </span>
+                      </div>
+                    )}
                     <p className="muted small">
                       Berhasil {k.ok} · Gagal {k.fail} · Hari ini {k.today} permintaan (WIB) · Terakhir dipakai {ago(k.last)}
                     </p>
@@ -325,12 +361,16 @@ function Dash({ onLogout }) {
             {keys.keys.length < keys.max && (
               <>
                 <div className="field">
-                  <label htmlFor="gk">Tambah key</label>
+                  <label htmlFor="gn">Nama key (opsional)</label>
+                  <input id="gn" value={newKeyName} maxLength={40} onChange={(e) => setNewKeyName(e.target.value)} autoComplete="off" placeholder="Misal: Proyek utama" />
+                </div>
+                <div className="field">
+                  <label htmlFor="gk">API key</label>
                   <input id="gk" type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} autoComplete="off" placeholder="AIza…" />
                 </div>
                 <div className="row">
                   <Btn busy={busy === "key-add"} disabled={!newKey.trim() || anyBusy}
-                    onClick={() => run("key-add", async () => { await api("/api/admin/keys", { action: "add", key: newKey }); setNewKey(""); }, "Key ditambahkan.")}>
+                    onClick={() => run("key-add", async () => { await api("/api/admin/keys", { action: "add", key: newKey, name: newKeyName }); setNewKey(""); setNewKeyName(""); }, "Key ditambahkan.")}>
                     {busy === "key-add" ? "Menambahkan…" : "Tambah key"}
                   </Btn>
                   {resetBtn}
