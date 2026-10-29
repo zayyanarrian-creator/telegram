@@ -99,6 +99,13 @@ export default function HomeView({ link }) {
           </ol>
         </section>
       </main>
+
+      <footer className="foot">
+        <div className="foot-in">
+          <p className="foot-tag">{t.ft1}</p>
+          <p className="foot-copy">{t.ft2}</p>
+        </div>
+      </footer>
     </>
   );
 }
