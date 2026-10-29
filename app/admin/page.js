@@ -28,8 +28,8 @@ export default function Admin() {
   useEffect(() => { refresh(); }, []);
 
   return (
-    <main className="wrap">
-      {view === "loading" && <p className="muted">Memuat…</p>}
+    <main className={view === "dash" ? undefined : "wrap"}>
+      {view === "loading" && <Loader />}
       {view === "error" && <div className="msg bad">{err}</div>}
       {(view === "setup" || view === "login") && (
         <Auth mode={view} needsCode={needsCode} onDone={refresh} />
@@ -73,7 +73,7 @@ function Auth({ mode, needsCode, onDone }) {
           <input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             autoComplete={setup ? "new-password" : "current-password"} />
         </div>
-        <button className="btn" disabled={busy}>{setup ? "Buat password" : "Masuk"}</button>
+        <Btn busy={busy}>{busy ? "Memproses…" : setup ? "Buat password" : "Masuk"}</Btn>
       </form>
     </div>
   );
@@ -106,6 +106,43 @@ function keyLabel(k) {
   return "Siap";
 }
 
+
+function Btn({ busy, children, className = "", disabled, ...rest }) {
+  return (
+    <button className={"btn " + className + (busy ? " loading" : "")} disabled={disabled || busy} {...rest}>
+      {busy && <span className="spin" aria-hidden="true" />}
+      <span>{children}</span>
+    </button>
+  );
+}
+
+function Loader({ text = "Memuat…" }) {
+  return (
+    <div className="loader" role="status">
+      <span className="spin big" aria-hidden="true" />
+      <span>{text}</span>
+    </div>
+  );
+}
+
+const MENU = [
+  { group: "Bot", items: [
+    { id: "token", label: "Token bot", icon: "🔑" },
+    { id: "webhook", label: "Webhook", icon: "🔗" },
+  ] },
+  { group: "AI", items: [
+    { id: "keys", label: "Kunci API Gemini", icon: "🗝️" },
+    { id: "ai", label: "Perilaku AI", icon: "🧠" },
+    { id: "test", label: "Tes balasan", icon: "🧪" },
+  ] },
+  { group: "Pengguna", items: [
+    { id: "welcome", label: "Pesan sambutan", icon: "👋" },
+    { id: "limit", label: "Batas pesan", icon: "⏱️" },
+    { id: "logs", label: "Log pesan", icon: "📜" },
+  ] },
+];
+const ALL = MENU.flatMap((g) => g.items);
+
 function Dash({ onLogout }) {
   const [cfg, setCfg] = useState(null);
   const [keys, setKeys] = useState(null);
@@ -118,9 +155,29 @@ function Dash({ onLogout }) {
   const [newKey, setNewKey] = useState("");
   const [testMsg, setTestMsg] = useState("Halo, kamu siapa?");
   const [testOut, setTestOut] = useState(null);
-  const [testing, setTesting] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(null); // id aksi yang sedang berjalan
+  const [page, setPage] = useState("token");
+  const [navOpen, setNavOpen] = useState(false);
   const note = (text, bad) => setMsg({ text, bad });
+
+  // ingat halaman terakhir lewat hash URL (#keys, #logs, ...)
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (ALL.some((m) => m.id === h)) setPage(h);
+  }, []);
+  function go(id) {
+    setPage(id); setNavOpen(false); setMsg(null);
+    history.replaceState(null, "", "#" + id);
+    window.scrollTo({ top: 0 });
+  }
+
+  // pesan sukses hilang sendiri setelah beberapa detik
+  useEffect(() => {
+    if (!msg || msg.bad) return;
+    const t = setTimeout(() => setMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [msg]);
 
   async function load() {
     const c = await api("/api/admin/settings");
@@ -134,238 +191,317 @@ function Dash({ onLogout }) {
   }
   useEffect(() => { load().catch((e) => note(e.message, true)); }, []);
 
-  async function run(fn, okText) {
-    setMsg(null);
-    try { await fn(); note(okText); await load(); } catch (e) { note(e.message, true); }
+  // Jalankan aksi dengan animasi loading di tombol yang ditekan (id).
+  async function run(id, fn, okText) {
+    if (busy) return;
+    setMsg(null); setBusy(id);
+    try { await fn(); await load(); note(okText); } catch (e) { note(e.message, true); }
+    setBusy(null);
   }
 
   async function runTest() {
-    setTesting(true); setTestOut(null);
+    if (busy) return;
+    setBusy("test"); setTestOut(null);
     try {
       const r = await api("/api/admin/test", { message: testMsg });
       setTestOut({ text: r.text });
     } catch (e) {
       setTestOut({ text: e.message, bad: true });
     }
-    setTesting(false);
+    setBusy(null);
     api("/api/admin/keys").then(setKeys).catch(() => {});
   }
 
-  if (!cfg || !keys) return <p className="muted">Memuat…</p>;
+  const cur = ALL.find((m) => m.id === page) || ALL[0];
+  const anyBusy = !!busy;
+
+  const body = (() => {
+    if (!cfg || !keys) return <Loader />;
+    switch (page) {
+      case "token": return (
+        <section className="card">
+          <h2>Token bot</h2>
+          <p className="muted">
+            {cfg.hasToken ? <>Tersimpan: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
+          </p>
+          <div className="field">
+            <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>
+            <input id="tk" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="123456789:AA…" />
+          </div>
+          <Btn busy={busy === "token"} disabled={!token.trim() || anyBusy}
+            onClick={() => run("token", async () => { await api("/api/admin/settings", { token }); setToken(""); }, "Token disimpan.")}>
+            {busy === "token" ? "Menyimpan…" : "Simpan token"}
+          </Btn>
+        </section>
+      );
+
+      case "webhook": return (
+        <section className="card">
+          <h2>Webhook</h2>
+          {!cfg.hasToken ? <p className="muted">Simpan token dulu di menu Token bot.</p> : (
+            <>
+              <p>
+                Status:{" "}
+                {wh?.active ? <span className="badge ok">Aktif</span> : <span className="badge bad">Belum aktif</span>}
+                {wh && <span className="muted"> · {wh.pending} pesan menunggu</span>}
+              </p>
+              {wh?.error && <p className="muted">Error terakhir dari Telegram: {wh.error}</p>}
+              <p className="muted">Pasang webhook dari alamat domain utama kamu, bukan dari alamat preview.</p>
+              <div className="row">
+                <Btn busy={busy === "wh-set"} disabled={anyBusy} onClick={() => run("wh-set", () => api("/api/admin/webhook", { action: "set" }), "Webhook terpasang.")}>
+                  {busy === "wh-set" ? "Memasang…" : "Pasang webhook"}
+                </Btn>
+                <Btn className="ghost" busy={busy === "wh-del"} disabled={anyBusy} onClick={() => run("wh-del", () => api("/api/admin/webhook", { action: "delete" }), "Webhook dilepas.")}>
+                  {busy === "wh-del" ? "Melepas…" : "Lepas webhook"}
+                </Btn>
+                <Btn className="ghost" busy={busy === "wh-ref"} disabled={anyBusy} onClick={() => run("wh-ref", async () => {}, "Status disegarkan.")}>
+                  {busy === "wh-ref" ? "Memuat…" : "Segarkan status"}
+                </Btn>
+              </div>
+            </>
+          )}
+        </section>
+      );
+
+      case "keys": {
+        const hasBad = keys.keys.some((k) => k.state);
+        const resetBtn = hasBad && (
+          <Btn className="ghost" busy={busy === "key-reset"} disabled={anyBusy}
+            onClick={() => run("key-reset", () => api("/api/admin/keys", { action: "reset" }), "Status key direset.")}>
+            {busy === "key-reset" ? "Mereset…" : "Reset status key"}
+          </Btn>
+        );
+        return (
+          <section className="card">
+            <h2>Kunci API Gemini</h2>
+            <p className="muted">
+              Maksimal {keys.max} key. Bot memakai key bergantian, dan kalau satu key kena batas atau ditolak, otomatis pindah ke key berikutnya.
+              Batas pemakaian dihitung per proyek Google, jadi buat tiap key di proyek yang berbeda di Google AI Studio supaya kuotanya terpisah.
+            </p>
+            {keys.keys.length === 0 ? (
+              <p className="muted">Belum ada key.</p>
+            ) : (
+              <ul className="plain" style={{ margin: "0 0 14px" }}>
+                {keys.keys.map((k) => (
+                  <li key={k.slot} className="keyitem">
+                    <div className="row" style={{ justifyContent: "space-between" }}>
+                      <span>
+                        <code>#{k.slot} {k.mask}</code>{" "}
+                        <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
+                      </span>
+                      <Btn className="ghost" busy={busy === "del-" + k.slot} disabled={anyBusy}
+                        onClick={() => run("del-" + k.slot, () => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>
+                        {busy === "del-" + k.slot ? "Menghapus…" : "Hapus"}
+                      </Btn>
+                    </div>
+                    <p className="muted small">
+                      Berhasil {k.ok} · Gagal {k.fail} · Hari ini {k.today} permintaan (WIB) · Terakhir dipakai {ago(k.last)}
+                    </p>
+                    {k.err && <p className="muted small">Error terakhir ({ago(k.errAt)}): {k.err}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {keys.keys.length < keys.max && (
+              <>
+                <div className="field">
+                  <label htmlFor="gk">Tambah key</label>
+                  <input id="gk" type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} autoComplete="off" placeholder="AIza…" />
+                </div>
+                <div className="row">
+                  <Btn busy={busy === "key-add"} disabled={!newKey.trim() || anyBusy}
+                    onClick={() => run("key-add", async () => { await api("/api/admin/keys", { action: "add", key: newKey }); setNewKey(""); }, "Key ditambahkan.")}>
+                    {busy === "key-add" ? "Menambahkan…" : "Tambah key"}
+                  </Btn>
+                  {resetBtn}
+                </div>
+              </>
+            )}
+            {keys.keys.length >= keys.max && resetBtn}
+          </section>
+        );
+      }
+
+      case "ai": return (
+        <section className="card">
+          <h2>Perilaku AI</h2>
+          <div className="field">
+            <label htmlFor="md">Model Gemini</label>
+            <input id="md" list="models" value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} autoComplete="off" />
+            <datalist id="models">
+              <option value="gemini-3.1-flash-lite" />
+              <option value="gemini-3.8-flash" />
+            </datalist>
+            <p className="muted hint">Kalau tes bilang model tidak ditemukan, cek nama model terbaru di ai.google.dev.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="sp">System prompt</label>
+            <textarea id="sp" value={ai.systemPrompt} onChange={(e) => setAi({ ...ai, systemPrompt: e.target.value })} maxLength={4000} />
+            <p className="muted hint">Instruksi tetap untuk AI: peran, gaya bahasa, batasan topik.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="hl">Riwayat chat (jumlah tanya-jawab yang diingat, 0 sampai 20)</label>
+            <input id="hl" type="number" min={0} max={20} value={ai.historyLimit}
+              onChange={(e) => setAi({ ...ai, historyLimit: e.target.value })} />
+            <p className="muted hint">Pengguna bisa menghapus riwayatnya sendiri dengan mengetik /reset. Riwayat hilang otomatis setelah 7 hari tanpa percakapan.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="fb">Pesan cadangan</label>
+            <textarea id="fb" style={{ minHeight: 70 }} value={ai.fallbackText} onChange={(e) => setAi({ ...ai, fallbackText: e.target.value })} maxLength={500} />
+            <p className="muted hint">Dikirim ke pengguna kalau Gemini gagal menjawab (semua key kena batas, error, atau tidak ada key).</p>
+          </div>
+          <Btn busy={busy === "ai"} disabled={anyBusy}
+            onClick={() => run("ai", () => api("/api/admin/settings", {
+              model: ai.model, systemPrompt: ai.systemPrompt, fallbackText: ai.fallbackText, historyLimit: Number(ai.historyLimit),
+            }), "Pengaturan AI disimpan.")}>
+            {busy === "ai" ? "Menyimpan…" : "Simpan pengaturan AI"}
+          </Btn>
+        </section>
+      );
+
+      case "limit": return (
+        <section className="card">
+          <h2>Batas pesan per pengguna</h2>
+          <p className="muted">
+            Membatasi berapa pesan yang boleh dikirim satu pengguna dalam rentang waktu tertentu, supaya kuota key tidak habis oleh satu orang.
+            Perintah /start dan /reset tidak dihitung. Isi 0 pada jumlah pesan untuk mematikan batas.
+          </p>
+          <div className="row">
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label htmlFor="lc">Jumlah pesan</label>
+              <input id="lc" type="number" min={0} max={1000} value={lim.limitCount}
+                onChange={(e) => setLim({ ...lim, limitCount: e.target.value })} />
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label htmlFor="lm">Per berapa menit</label>
+              <input id="lm" type="number" min={1} max={1440} value={lim.limitMinutes}
+                onChange={(e) => setLim({ ...lim, limitMinutes: e.target.value })} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="lt">Pesan saat batas tercapai</label>
+            <textarea id="lt" style={{ minHeight: 70 }} value={lim.limitText} maxLength={500}
+              onChange={(e) => setLim({ ...lim, limitText: e.target.value })} />
+            <p className="muted hint"><code>{"{sisa}"}</code> diganti sisa waktu tunggu dalam menit. Pesan ini dikirim sekali per rentang waktu, pesan berikutnya dari orang yang sama diabaikan tanpa balasan.</p>
+          </div>
+          <Btn busy={busy === "limit"} disabled={anyBusy}
+            onClick={() => run("limit", () => api("/api/admin/settings", {
+              limitCount: Number(lim.limitCount), limitMinutes: Number(lim.limitMinutes), limitText: lim.limitText,
+            }), "Batas pesan disimpan.")}>
+            {busy === "limit" ? "Menyimpan…" : "Simpan batas pesan"}
+          </Btn>
+        </section>
+      );
+
+      case "logs": return (
+        <section className="card">
+          <h2>Log pesan</h2>
+          <p className="muted">
+            50 pesan terakhir (maksimal 200 tersimpan, tiap pesan dipotong 300 karakter, hilang otomatis 30 hari setelah pesan terakhir).
+            Log berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
+          </p>
+          <div className="row" style={{ marginBottom: 14 }}>
+            <Btn className="ghost" busy={busy === "log-ref"} disabled={anyBusy} onClick={() => run("log-ref", async () => {}, "Log disegarkan.")}>
+              {busy === "log-ref" ? "Memuat…" : "Segarkan"}
+            </Btn>
+            <Btn className="ghost" busy={busy === "log-clear"} disabled={!logs?.length || anyBusy}
+              onClick={() => { if (confirm("Hapus semua log pesan?")) run("log-clear", () => api("/api/admin/logs", { action: "clear" }), "Log dihapus."); }}>
+              {busy === "log-clear" ? "Menghapus…" : "Hapus semua log"}
+            </Btn>
+          </div>
+          {!logs?.length ? <p className="muted">Belum ada pesan.</p> : (
+            <ul className="plain">
+              {logs.map((l, i) => (
+                <li key={l.t + "-" + i} className="logitem">
+                  <div className="row small muted">
+                    <span>{fmtTime(l.t)}</span>
+                    <span>{l.name}</span>
+                    <span className={"badge " + (l.st === "ok" ? "ok" : "bad")}>{LOG_ST[l.st] || l.st}</span>
+                    {l.slot && <span>key #{l.slot}</span>}
+                    {l.ms != null && <span>{(l.ms / 1000).toFixed(1)} dtk</span>}
+                  </div>
+                  <div className="logtext"><b>Tanya:</b> {l.q}</div>
+                  <div className="logtext muted"><b>{l.st === "ok" ? "Jawab" : "Keterangan"}:</b> {l.a}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      );
+
+      case "test": return (
+        <section className="card">
+          <h2>Tes balasan</h2>
+          <p className="muted">Mencoba Gemini langsung dari sini, tanpa lewat Telegram. Tes tidak memakai riwayat chat.</p>
+          <div className="field">
+            <label htmlFor="tm">Pesan uji coba</label>
+            <input id="tm" value={testMsg} onChange={(e) => setTestMsg(e.target.value)} maxLength={2000} />
+          </div>
+          <Btn busy={busy === "test"} disabled={!testMsg.trim() || anyBusy} onClick={runTest}>
+            {busy === "test" ? "Menunggu jawaban…" : "Kirim tes"}
+          </Btn>
+          {testOut && (
+            <div className={"msg " + (testOut.bad ? "bad" : "ok")} style={{ marginTop: 14, whiteSpace: "pre-wrap" }}>{testOut.text}</div>
+          )}
+        </section>
+      );
+
+      case "welcome": return (
+        <section className="card">
+          <h2>Pesan sambutan (/start)</h2>
+          <p className="muted">Dikirim saat pengguna menekan Start. <code>{"{nama}"}</code> diganti nama depan pengirim.</p>
+          <div className="field">
+            <label htmlFor="rp">Teks sambutan</label>
+            <textarea id="rp" value={reply} onChange={(e) => setReply(e.target.value)} maxLength={1000} />
+          </div>
+          <Btn busy={busy === "welcome"} disabled={anyBusy} onClick={() => run("welcome", () => api("/api/admin/settings", { replyText: reply }), "Pesan sambutan disimpan.")}>
+            {busy === "welcome" ? "Menyimpan…" : "Simpan sambutan"}
+          </Btn>
+        </section>
+      );
+      default: return null;
+    }
+  })();
 
   return (
-    <>
-      <div className="top">
-        <h1 style={{ fontSize: "1.8rem", margin: 0 }}>Admin bot</h1>
-        <button className="btn ghost" onClick={onLogout}>Keluar</button>
-      </div>
-      {msg && <div className={"msg " + (msg.bad ? "bad" : "ok")}>{msg.text}</div>}
+    <div className="shell">
+      {busy && <div className="progress" aria-hidden="true" />}
+      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
 
-      <section className="card">
-        <h2>Token bot</h2>
-        <p className="muted">
-          {cfg.hasToken ? <>Tersimpan: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
-        </p>
-        <div className="field">
-          <label htmlFor="tk">{cfg.hasToken ? "Ganti token" : "Token baru"}</label>
-          <input id="tk" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="123456789:AA…" />
-        </div>
-        <button className="btn" disabled={!token.trim()}
-          onClick={() => run(async () => { await api("/api/admin/settings", { token }); setToken(""); }, "Token disimpan.")}>
-          Simpan token
-        </button>
-      </section>
-
-      <section className="card">
-        <h2>Webhook</h2>
-        {!cfg.hasToken ? <p className="muted">Simpan token dulu.</p> : (
-          <>
-            <p>
-              Status:{" "}
-              {wh?.active ? <span className="badge ok">Aktif</span> : <span className="badge bad">Belum aktif</span>}
-              {wh && <span className="muted"> · {wh.pending} pesan menunggu</span>}
-            </p>
-            {wh?.error && <p className="muted">Error terakhir dari Telegram: {wh.error}</p>}
-            <p className="muted">Pasang webhook dari alamat domain utama kamu, bukan dari alamat preview.</p>
-            <div className="row">
-              <button className="btn" onClick={() => run(() => api("/api/admin/webhook", { action: "set" }), "Webhook terpasang.")}>Pasang webhook</button>
-              <button className="btn ghost" onClick={() => run(() => api("/api/admin/webhook", { action: "delete" }), "Webhook dilepas.")}>Lepas webhook</button>
-              <button className="btn ghost" onClick={() => load().catch((e) => note(e.message, true))}>Segarkan status</button>
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Kunci API Gemini</h2>
-        <p className="muted">
-          Maksimal {keys.max} key. Bot memakai key bergantian, dan kalau satu key kena batas atau ditolak, otomatis pindah ke key berikutnya.
-          Batas pemakaian dihitung per proyek Google, jadi buat tiap key di proyek yang berbeda di Google AI Studio supaya kuotanya terpisah.
-        </p>
-        {keys.keys.length === 0 ? (
-          <p className="muted">Belum ada key.</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: "0 0 14px" }}>
-            {keys.keys.map((k) => (
-              <li key={k.slot} className="keyitem">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <span>
-                    <code>#{k.slot} {k.mask}</code>{" "}
-                    <span className={"badge " + (k.state ? "bad" : "ok")}>{keyLabel(k)}</span>
-                  </span>
-                  <button className="btn ghost" onClick={() => run(() => api("/api/admin/keys", { action: "remove", slot: k.slot }), "Key dihapus.")}>Hapus</button>
-                </div>
-                <p className="muted small">
-                  Berhasil {k.ok} · Gagal {k.fail} · Hari ini {k.today} permintaan (WIB) · Terakhir dipakai {ago(k.last)}
-                </p>
-                {k.err && <p className="muted small">Error terakhir ({ago(k.errAt)}): {k.err}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-        {keys.keys.length < keys.max && (
-          <>
-            <div className="field">
-              <label htmlFor="gk">Tambah key</label>
-              <input id="gk" type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} autoComplete="off" placeholder="AIza…" />
-            </div>
-            <div className="row">
-              <button className="btn" disabled={!newKey.trim()}
-                onClick={() => run(async () => { await api("/api/admin/keys", { action: "add", key: newKey }); setNewKey(""); }, "Key ditambahkan.")}>
-                Tambah key
-              </button>
-              {keys.keys.some((k) => k.state) && (
-                <button className="btn ghost" onClick={() => run(() => api("/api/admin/keys", { action: "reset" }), "Status key direset.")}>Reset status key</button>
-              )}
-            </div>
-          </>
-        )}
-        {keys.keys.length >= keys.max && keys.keys.some((k) => k.state) && (
-          <button className="btn ghost" onClick={() => run(() => api("/api/admin/keys", { action: "reset" }), "Status key direset.")}>Reset status key</button>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Perilaku AI</h2>
-        <div className="field">
-          <label htmlFor="md">Model Gemini</label>
-          <input id="md" list="models" value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} autoComplete="off" />
-          <datalist id="models">
-            <option value="gemini-3.1-flash-lite" />
-            <option value="gemini-3.8-flash" />
-          </datalist>
-          <p className="muted" style={{ margin: "6px 0 0" }}>Kalau tes bilang model tidak ditemukan, cek nama model terbaru di ai.google.dev.</p>
-        </div>
-        <div className="field">
-          <label htmlFor="sp">System prompt</label>
-          <textarea id="sp" value={ai.systemPrompt} onChange={(e) => setAi({ ...ai, systemPrompt: e.target.value })} maxLength={4000} />
-          <p className="muted" style={{ margin: "6px 0 0" }}>Instruksi tetap untuk AI: peran, gaya bahasa, batasan topik.</p>
-        </div>
-        <div className="field">
-          <label htmlFor="hl">Riwayat chat (jumlah tanya-jawab yang diingat, 0 sampai 20)</label>
-          <input id="hl" type="number" min={0} max={20} value={ai.historyLimit}
-            onChange={(e) => setAi({ ...ai, historyLimit: e.target.value })} />
-          <p className="muted" style={{ margin: "6px 0 0" }}>Pengguna bisa menghapus riwayatnya sendiri dengan mengetik /reset. Riwayat hilang otomatis setelah 7 hari tanpa percakapan.</p>
-        </div>
-        <div className="field">
-          <label htmlFor="fb">Pesan cadangan</label>
-          <textarea id="fb" style={{ minHeight: 70 }} value={ai.fallbackText} onChange={(e) => setAi({ ...ai, fallbackText: e.target.value })} maxLength={500} />
-          <p className="muted" style={{ margin: "6px 0 0" }}>Dikirim ke pengguna kalau Gemini gagal menjawab (semua key kena batas, error, atau tidak ada key).</p>
-        </div>
-        <button className="btn"
-          onClick={() => run(() => api("/api/admin/settings", {
-            model: ai.model, systemPrompt: ai.systemPrompt, fallbackText: ai.fallbackText, historyLimit: Number(ai.historyLimit),
-          }), "Pengaturan AI disimpan.")}>
-          Simpan pengaturan AI
-        </button>
-      </section>
-
-      <section className="card">
-        <h2>Batas pesan per pengguna</h2>
-        <p className="muted">
-          Membatasi berapa pesan yang boleh dikirim satu pengguna dalam rentang waktu tertentu, supaya kuota key tidak habis oleh satu orang.
-          Perintah /start dan /reset tidak dihitung. Isi 0 pada jumlah pesan untuk mematikan batas.
-        </p>
-        <div className="row">
-          <div className="field" style={{ flex: 1, minWidth: 140 }}>
-            <label htmlFor="lc">Jumlah pesan</label>
-            <input id="lc" type="number" min={0} max={1000} value={lim.limitCount}
-              onChange={(e) => setLim({ ...lim, limitCount: e.target.value })} />
-          </div>
-          <div className="field" style={{ flex: 1, minWidth: 140 }}>
-            <label htmlFor="lm">Per berapa menit</label>
-            <input id="lm" type="number" min={1} max={1440} value={lim.limitMinutes}
-              onChange={(e) => setLim({ ...lim, limitMinutes: e.target.value })} />
+      <aside className={"side" + (navOpen ? " open" : "")}>
+        <div className="brand">
+          <span className="logo">🤖</span>
+          <div>
+            <b>Admin bot</b>
+            {cfg?.username && <div className="muted small">@{cfg.username}</div>}
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="lt">Pesan saat batas tercapai</label>
-          <textarea id="lt" style={{ minHeight: 70 }} value={lim.limitText} maxLength={500}
-            onChange={(e) => setLim({ ...lim, limitText: e.target.value })} />
-          <p className="muted" style={{ margin: "6px 0 0" }}><code>{"{sisa}"}</code> diganti sisa waktu tunggu dalam menit. Pesan ini dikirim sekali per rentang waktu, pesan berikutnya dari orang yang sama diabaikan tanpa balasan.</p>
-        </div>
-        <button className="btn"
-          onClick={() => run(() => api("/api/admin/settings", {
-            limitCount: Number(lim.limitCount), limitMinutes: Number(lim.limitMinutes), limitText: lim.limitText,
-          }), "Batas pesan disimpan.")}>
-          Simpan batas pesan
-        </button>
-      </section>
+        <nav aria-label="Menu admin">
+          {MENU.map((g) => (
+            <div key={g.group} className="navgroup">
+              <div className="navtitle">{g.group}</div>
+              {g.items.map((m) => (
+                <button key={m.id} className={"navitem" + (page === m.id ? " active" : "")}
+                  aria-current={page === m.id ? "page" : undefined} onClick={() => go(m.id)}>
+                  <span className="ico" aria-hidden="true">{m.icon}</span>{m.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <button className="navitem logout" onClick={onLogout}><span className="ico" aria-hidden="true">🚪</span>Keluar</button>
+      </aside>
 
-      <section className="card">
-        <h2>Log pesan</h2>
-        <p className="muted">
-          50 pesan terakhir (maksimal 200 tersimpan, tiap pesan dipotong 300 karakter, hilang otomatis 30 hari setelah pesan terakhir).
-          Log berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
-        </p>
-        <div className="row" style={{ marginBottom: 14 }}>
-          <button className="btn ghost" onClick={() => load().catch((e) => note(e.message, true))}>Segarkan</button>
-          <button className="btn ghost" disabled={!logs?.length}
-            onClick={() => { if (confirm("Hapus semua log pesan?")) run(() => api("/api/admin/logs", { action: "clear" }), "Log dihapus."); }}>
-            Hapus semua log
+      <div className="content">
+        <header className="topbar">
+          <button className="burger" aria-label="Buka menu" onClick={() => setNavOpen(true)}>
+            <span /><span /><span />
           </button>
-        </div>
-        {!logs?.length ? <p className="muted">Belum ada pesan.</p> : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {logs.map((l, i) => (
-              <li key={l.t + "-" + i} className="logitem">
-                <div className="row small muted">
-                  <span>{fmtTime(l.t)}</span>
-                  <span>{l.name}</span>
-                  <span className={"badge " + (l.st === "ok" ? "ok" : "bad")}>{LOG_ST[l.st] || l.st}</span>
-                  {l.slot && <span>key #{l.slot}</span>}
-                  {l.ms != null && <span>{(l.ms / 1000).toFixed(1)} dtk</span>}
-                </div>
-                <div className="logtext"><b>Tanya:</b> {l.q}</div>
-                <div className="logtext muted"><b>{l.st === "ok" ? "Jawab" : "Keterangan"}:</b> {l.a}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Tes balasan</h2>
-        <p className="muted">Mencoba Gemini langsung dari sini, tanpa lewat Telegram. Tes tidak memakai riwayat chat.</p>
-        <div className="field">
-          <label htmlFor="tm">Pesan uji coba</label>
-          <input id="tm" value={testMsg} onChange={(e) => setTestMsg(e.target.value)} maxLength={2000} />
-        </div>
-        <button className="btn" disabled={testing || !testMsg.trim()} onClick={runTest}>{testing ? "Menunggu jawaban…" : "Kirim tes"}</button>
-        {testOut && (
-          <div className={"msg " + (testOut.bad ? "bad" : "ok")} style={{ marginTop: 14, whiteSpace: "pre-wrap" }}>{testOut.text}</div>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Pesan sambutan (/start)</h2>
-        <p className="muted">Dikirim saat pengguna menekan Start. <code>{"{nama}"}</code> diganti nama depan pengirim.</p>
-        <div className="field">
-          <label htmlFor="rp">Teks sambutan</label>
-          <textarea id="rp" value={reply} onChange={(e) => setReply(e.target.value)} maxLength={1000} />
-        </div>
-        <button className="btn" onClick={() => run(() => api("/api/admin/settings", { replyText: reply }), "Pesan sambutan disimpan.")}>Simpan sambutan</button>
-      </section>
-    </>
+          <h1>{cur.label}</h1>
+        </header>
+        {msg && <div className={"msg " + (msg.bad ? "bad" : "ok")} role="status">{msg.text}</div>}
+        <div key={page} className="page">{body}</div>
+      </div>
+    </div>
   );
 }

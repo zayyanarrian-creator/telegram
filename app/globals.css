@@ -48,3 +48,59 @@ ol.steps { padding-left: 1.2em; } ol.steps li { margin: 0 0 .5em; }
 .logitem .row { gap: 4px 12px; margin: 0 0 4px; }
 .logtext { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
 @media (prefers-reduced-motion: no-preference) { .btn { transition: opacity .15s; } }
+
+/* ===== Admin: sidebar layout ===== */
+.shell { display: flex; min-height: 100vh; }
+.side { position: sticky; top: 0; align-self: flex-start; height: 100vh; width: 260px; flex: none;
+  display: flex; flex-direction: column; gap: 8px; padding: 20px 14px; overflow-y: auto;
+  background: var(--card); border-right: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; padding: 4px 10px 16px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.brand b { font-size: 1.05rem; line-height: 1.2; }
+.brand .small { margin: 0; }
+.logo { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; font-size: 1.3rem;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.navgroup { margin: 8px 0 4px; }
+.navtitle { padding: 0 12px 6px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.navitem { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; margin: 0 0 2px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-weight: 500;
+  text-align: left; cursor: pointer; }
+.navitem:hover { background: var(--bg); }
+.navitem.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; }
+.navitem:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.navitem .ico { width: 1.4em; text-align: center; }
+.navitem.logout { margin-top: auto; color: var(--bad); border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; padding-top: 14px; }
+.content { flex: 1; min-width: 0; max-width: 860px; padding: 28px 28px 64px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; }
+.topbar h1 { font-size: 1.7rem; margin: 0; }
+.burger { display: none; width: 42px; height: 42px; flex: none; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); cursor: pointer; flex-direction: column; gap: 4px; align-items: center; justify-content: center; }
+.burger span { width: 18px; height: 2px; border-radius: 2px; background: var(--ink); }
+.scrim { display: none; }
+ul.plain { list-style: none; padding: 0; margin: 0; }
+.hint { margin: 6px 0 0; }
+.page { animation: pagein .22s ease-out; }
+@keyframes pagein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ===== Loading ===== */
+.spin { display: inline-block; width: 1em; height: 1em; flex: none; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
+.spin.big { width: 22px; height: 22px; color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.loading { opacity: 1; cursor: progress; }
+.btn.loading:disabled { opacity: .85; pointer-events: none; }
+.loader { display: flex; align-items: center; gap: 12px; padding: 40px 0; color: var(--mute); }
+.progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50; overflow: hidden; background: transparent; }
+.progress::before { content: ""; display: block; height: 100%; width: 40%; background: var(--accent);
+  border-radius: 3px; animation: slide 1s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+@media (max-width: 800px) {
+  .side { position: fixed; z-index: 40; left: 0; top: 0; bottom: 0; transform: translateX(-100%);
+    transition: transform .2s ease; box-shadow: 0 0 40px rgba(0,0,0,.25); }
+  .side.open { transform: none; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4); }
+  .burger { display: flex; }
+  .content { padding: 18px 16px 48px; }
+  .topbar h1 { font-size: 1.35rem; }
+}
