@@ -4,6 +4,40 @@ import { addLog, addConv, checkLimit } from "@/lib/activity";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+/* ---------- foto dari pengguna ---------- */
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024; // batas aman agar permintaan ke Gemini tidak terlalu besar
+const MIME_BY_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif" };
+
+// Mengembalikan { ok, image: { mime, data } } atau { ok: false, reason }.
+// Foto biasa: Telegram menyediakan beberapa ukuran, kita ambil yang terbesar yang masih muat.
+async function fetchImage(botToken, msg) {
+  let fileId = null;
+  let mime = "image/jpeg";
+  if (Array.isArray(msg.photo) && msg.photo.length) {
+    const sizes = [...msg.photo].sort((a, b) => (a.file_size || 0) - (b.file_size || 0));
+    const fit = sizes.filter((x) => !x.file_size || x.file_size <= MAX_IMAGE_BYTES);
+    fileId = (fit.length ? fit[fit.length - 1] : sizes[0])?.file_id;
+  } else if (msg.document?.mime_type?.startsWith("image/")) {
+    if ((msg.document.file_size || 0) > MAX_IMAGE_BYTES) return { ok: false, reason: "big" };
+    fileId = msg.document.file_id;
+    mime = msg.document.mime_type;
+  }
+  if (!fileId) return { ok: false, reason: "none" };
+
+  const info = await tg(botToken, "getFile", { file_id: fileId });
+  const path = info?.result?.file_path;
+  if (!info?.ok || !path) return { ok: false, reason: "fail" };
+  if ((info.result.file_size || 0) > MAX_IMAGE_BYTES) return { ok: false, reason: "big" };
+
+  const ext = path.split(".").pop().toLowerCase();
+  if (MIME_BY_EXT[ext]) mime = MIME_BY_EXT[ext];
+  const res = await fetch(`https://api.telegram.org/file/bot${botToken}/${path}`, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) return { ok: false, reason: "fail" };
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_IMAGE_BYTES) return { ok: false, reason: "big" };
+  return { ok: true, image: { mime, data: buf.toString("base64") } };
+}
+
 export async function POST(req) {
   const cfg = await redis.hgetall("cfg:bot");
   if (!cfg?.token || !cfg.secret) return new Response("not configured", { status: 503 });
@@ -21,7 +55,8 @@ export async function POST(req) {
       if (!first) return Response.json({ ok: true }); // update ganda
     }
 
-    if (msg?.text && msg.chat?.id) {
+    const isImage = !!(msg?.photo?.length || msg?.document?.mime_type?.startsWith("image/"));
+    if ((msg?.text || isImage) && msg.chat?.id) {
       const s = settingsFrom(cfg);
       const botToken = await decrypt(cfg.token);
       const chatId = msg.chat.id;
@@ -35,7 +70,9 @@ export async function POST(req) {
         for (const part of splitText(text)) await tg(botToken, "sendMessage", { chat_id: chatId, text: part });
         await addConv({ chatId, title, role: "bot", name: "Bot", text });
       };
-      const text = msg.text.trim().slice(0, 4000);
+      // Untuk foto, teksnya adalah caption (boleh kosong).
+      const caption = (msg.text || msg.caption || "").trim().slice(0, 4000);
+      const text = isImage ? `[Foto]${caption ? " " + caption : ""}` : caption;
       await addConv({ chatId, title, role: "user", name: who, text });
       const cmd = text.split(/[\s@]/)[0].toLowerCase();
 
@@ -60,7 +97,23 @@ export async function POST(req) {
         } else {
           tg(botToken, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
           const history = await getHistory(chatId, s.historyLimit);
-          const r = await generateReply({ text, history, settings: s });
+          let images = [];
+          let askText = text;
+          if (isImage) {
+            const got = await fetchImage(botToken, msg).catch(() => ({ ok: false, reason: "fail" }));
+            if (!got.ok) {
+              const note =
+                got.reason === "big"
+                  ? "Maaf, ukuran fotonya terlalu besar. Coba kirim foto yang lebih kecil ya."
+                  : "Maaf, fotonya belum bisa saya buka. Coba kirim ulang ya.";
+              await send(note);
+              await addLog({ uid, name: who, q: text, a: note, st: "error", ms: Date.now() - t0 });
+              return Response.json({ ok: true });
+            }
+            images = [got.image];
+            askText = caption || "(Pengunjung mengirim foto tanpa teks. Jelaskan singkat apa yang terlihat dan tanyakan apa yang ingin dibantu.)";
+          }
+          const r = await generateReply({ text: askText, history, settings: s, images });
           if (r.ok) {
             await send(r.text);
             await saveTurn(chatId, text, r.text, s.historyLimit);
