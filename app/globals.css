@@ -329,3 +329,9 @@ ul.keylist { margin: 0 0 22px; display: grid; gap: 10px; }
 .web:hover { border-color: var(--mute); }
 .web:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .web svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ===== Admin: daftar label-nilai (Token bot) ===== */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; margin: 4px 0 20px; align-items: center; }
+.kv dt { color: var(--mute); font-size: .9rem; }
+.kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.kv dd code { font-weight: 500; }

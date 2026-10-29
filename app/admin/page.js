@@ -358,10 +358,18 @@ function Dash({ onLogout }) {
     switch (page) {
       case "token": return (
         <section className="card">
-          <h2>Token bot</h2>
-          <p className="muted">
-            {cfg.hasToken ? <>Terhubung: <code>{cfg.tokenMasked}</code> (@{cfg.username})</> : "Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini."}
-          </p>
+          <div className="cardhead">
+            <h2>Token bot</h2>
+            {cfg.hasToken && <span className="badge ok">Terhubung</span>}
+          </div>
+          {cfg.hasToken ? (
+            <dl className="kv">
+              <dt>Token</dt><dd><code>{cfg.tokenMasked}</code></dd>
+              <dt>Id/username</dt><dd>@{cfg.username}</dd>
+            </dl>
+          ) : (
+            <p className="muted">Belum ada token. Buat bot lewat @BotFather lalu tempel tokennya di sini.</p>
+          )}
           {cfg.hasToken && !editToken ? (
             <Btn className="ghost" disabled={anyBusy} onClick={() => setEditToken(true)}>
               <Icon name="edit" size={16} />Edit token
