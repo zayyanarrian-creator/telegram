@@ -303,10 +303,21 @@ ul.keylist { margin: 0 0 22px; display: grid; gap: 10px; }
 }
 .btn > span { display: inline-flex; align-items: center; gap: 8px; }
 
-/* ===== Halaman 404 ===== */
-.nf { text-align: center; display: flex; flex-direction: column; align-items: center; padding-top: 10vh; }
-.nf h1 { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 0 0 .4em; }
-.nf p { margin-inline: auto; }
-.nf .row { justify-content: center; margin-top: 8px; }
-.nf-code { font-size: clamp(5rem, 22vw, 9rem); font-weight: 900; line-height: 1; letter-spacing: -.04em; margin: 0 0 .1em !important;
-  background: linear-gradient(135deg, var(--accent), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* ===== Halaman 404 (sama dengan portal) ===== */
+.nf { width: 100%; max-width: 400px; margin: 0 auto; padding: 56px 16px 48px; text-align: center; }
+.nf-code { font-size: clamp(72px, 22vw, 104px); font-weight: 600; line-height: 1.1; letter-spacing: -2px; color: var(--ink); }
+.nf-rule { width: 56px; height: 2px; background: var(--mute); opacity: .5; margin: 22px auto; }
+.nf h1 { font-size: 19px; font-weight: 600; letter-spacing: 0; margin: 0; }
+.nf-sub { color: var(--mute); font-size: 13px; margin: 8px auto 32px; }
+.nf-link { display: flex; align-items: center; gap: 16px; width: 100%; background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px; color: var(--ink); text-decoration: none; font-size: 15px; font-weight: 600; text-align: start; transition: .2s; }
+.nf-link:hover { border-color: var(--mute); transform: translateY(-2px); }
+.nf-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.nf-ico { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); display: grid; place-items: center; flex: none; }
+.nf-ico svg { width: 20px; height: 20px; stroke: var(--ink); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.nf-t { flex: 1; }
+.nf-ch { width: 16px; height: 16px; stroke: var(--mute); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+[dir="rtl"] .nf-ch { transform: scaleX(-1); }
+.nf-f { margin-top: 36px; font-size: 11px; color: var(--mute); }
+.lm { max-height: 60vh; overflow: auto; }
+@media (prefers-reduced-motion: reduce) { .nf-link { transition: none; } .nf-link:hover { transform: none; } }

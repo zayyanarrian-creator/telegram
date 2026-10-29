@@ -84,12 +84,6 @@ export default function HomeView({ link }) {
           </div>
         </section>
 
-        <section className="feat">
-          <div className="card"><h2>{t.f1t}</h2><p className="muted">{t.f1d}</p></div>
-          <div className="card"><h2>{t.f2t}</h2><p className="muted">{t.f2d}</p></div>
-          <div className="card"><h2>{t.f3t}</h2><p className="muted">{t.f3d}</p></div>
-        </section>
-
         <section>
           <h2>{t.how}</h2>
           <ol className="steps">
@@ -98,6 +92,13 @@ export default function HomeView({ link }) {
             <li>{t.s3}</li>
           </ol>
         </section>
+
+        <section className="feat">
+          <div className="card"><h2>{t.f1t}</h2><p className="muted">{t.f1d}</p></div>
+          <div className="card"><h2>{t.f2t}</h2><p className="muted">{t.f2d}</p></div>
+          <div className="card"><h2>{t.f3t}</h2><p className="muted">{t.f3d}</p></div>
+        </section>
+
       </main>
 
       <footer className="foot">
