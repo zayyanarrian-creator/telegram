@@ -418,7 +418,7 @@ function Dash({ onLogout }) {
                   {wh.error && (<><dt>Error terakhir</dt><dd>{wh.error}</dd></>)}
                 </dl>
               )}
-              <p className="muted lead">Pasang webhook dari alamat domain utama kamu, bukan dari alamat preview.</p>
+              <p className="muted lead">Webhook akan diarahkan ke alamat situs yang sedang kamu buka sekarang. Pastikan admin dibuka lewat telegram.emahairshop.com (bukan alamat sementara seperti xxx.vercel.app), baru klik Pasang webhook.</p>
               <div className="row">
                 <Btn busy={busy === "wh-set"} disabled={anyBusy} onClick={() => run("wh-set", () => api("/api/admin/webhook", { action: "set" }), "Webhook terpasang.")}>
                   {busy === "wh-set" ? "Memasang…" : "Pasang webhook"}
