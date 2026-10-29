@@ -8,20 +8,18 @@ async function getUsername() {
 export default async function Home() {
   const username = await getUsername();
   const link = username ? `https://t.me/${username}` : null;
-  const webChat = process.env.WEB_CHAT_OFF !== "1";
 
   return (
     <main className="wrap">
       <section className="hero">
         <h1>Tanya apa saja, bot menjawab saat itu juga.</h1>
-        <p>Kirim pesan lewat Telegram atau langsung dari halaman web ini. Tidak perlu menunggu admin online.</p>
+        <p>Kirim pesan lewat Telegram. Tidak perlu menunggu admin online.</p>
         <div className="row">
           {link ? (
             <a className="btn" href={link} target="_blank" rel="noopener noreferrer">Chat di Telegram</a>
           ) : (
             <span className="btn off">Bot belum aktif</span>
           )}
-          {webChat && <a className="btn ghost" href="/chat">Chat di web</a>}
         </div>
       </section>
 
@@ -34,8 +32,8 @@ export default async function Home() {
       <section>
         <h2>Cara memakai</h2>
         <ol className="steps">
-          <li>Pilih Chat di Telegram atau Chat di web.</li>
-          <li>Di Telegram, tekan Start di percakapan bot. Di web, langsung tulis pesan.</li>
+          <li>Pilih Chat di Telegram.</li>
+          <li>Tekan Start di percakapan bot.</li>
           <li>Kirim pertanyaanmu.</li>
         </ol>
       </section>

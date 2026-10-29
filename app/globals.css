@@ -112,3 +112,32 @@ textarea.brain { min-height: 340px; max-height: 70vh; font: .85rem/1.55 ui-monos
 .pill { display: inline-block; padding: 2px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; line-height: 1.6; }
 .pill.ok { background: var(--ok); color: var(--card); }
 .pill.off { background: var(--line); color: var(--mute); }
+
+/* ===== Admin: percakapan Telegram ===== */
+.convsearch { flex: 1 1 160px; width: auto; min-width: 0; }
+.convs { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 16px; align-items: start; }
+.convlist { max-height: 70vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; }
+.convitem { display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; padding: 10px 12px;
+  background: transparent; color: var(--ink); border: 0; border-bottom: 1px solid var(--line); font: inherit; text-align: left; cursor: pointer; }
+.convitem:hover { background: var(--bg); }
+.convitem.active { background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }
+.convitem b { overflow-wrap: anywhere; }
+.convitem .small { margin: 0; }
+.convitem:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.thread { border: 1px solid var(--line); border-radius: 12px; min-height: 240px; padding: 12px; }
+.threadhead { display: flex; align-items: center; gap: 10px; justify-content: space-between; margin: 0 0 10px; }
+.threadhead b { flex: 1; overflow-wrap: anywhere; }
+.threadhead .btn { padding: 6px 12px; }
+.back { display: none; }
+.msgs { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.bubble { max-width: 85%; padding: 8px 12px; border-radius: 14px; border: 1px solid var(--line); }
+.bubble.user { align-self: flex-start; background: var(--bg); }
+.bubble.bot { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.bubble.bot .muted { color: inherit; opacity: .8; }
+.bubble .small { margin: 0 0 2px; font-size: .75rem; }
+@media (max-width: 720px) {
+  .convs { grid-template-columns: 1fr; }
+  .convs.has-sel .convlist { display: none; }
+  .convs:not(.has-sel) .thread { display: none; }
+  .back { display: inline-flex; }
+}

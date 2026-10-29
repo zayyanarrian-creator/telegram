@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 async function api(path, body) {
   const r = await fetch(path, body
@@ -146,6 +146,93 @@ function Icon({ name, size = 18 }) {
   );
 }
 
+
+/* ---------- Percakapan Telegram: daftar di kiri, isi di kanan ---------- */
+function Convs({ note }) {
+  const [chats, setChats] = useState(null);
+  const [sel, setSel] = useState(null);
+  const [conv, setConv] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const endRef = useRef(null);
+
+  async function loadList() {
+    try { setChats((await api("/api/admin/chats")).chats); } catch (e) { note(e.message, true); setChats([]); }
+  }
+  async function open(id) {
+    setSel(id); setLoading(true);
+    try { setConv(await api("/api/admin/chats?id=" + encodeURIComponent(id))); } catch (e) { note(e.message, true); }
+    setLoading(false);
+  }
+  useEffect(() => { loadList(); }, []);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [conv]);
+
+  async function remove(id) {
+    if (!confirm("Hapus percakapan ini dari admin? Riwayat yang dipakai AI tidak ikut terhapus.")) return;
+    try { await api("/api/admin/chats", { action: "delete", id }); setSel(null); setConv(null); await loadList(); note("Percakapan dihapus."); }
+    catch (e) { note(e.message, true); }
+  }
+  async function removeAll() {
+    if (!confirm("Hapus semua percakapan yang tersimpan di admin?")) return;
+    try { await api("/api/admin/chats", { action: "clear" }); setSel(null); setConv(null); await loadList(); note("Semua percakapan dihapus."); }
+    catch (e) { note(e.message, true); }
+  }
+
+  if (!chats) return <Loader />;
+  const shown = chats.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase()));
+
+  return (
+    <section className="card">
+      <h2>Percakapan Telegram</h2>
+      <p className="muted">
+        Semua chat yang masuk ke bot, lengkap dengan balasannya. Maksimal 500 percakapan dan 200 pesan per percakapan,
+        hilang otomatis 30 hari setelah pesan terakhir. Berisi isi percakapan pengguna, jadi hapus kalau tidak diperlukan.
+      </p>
+      <div className="row" style={{ marginBottom: 14 }}>
+        <button className="btn ghost" onClick={() => { loadList(); if (sel) open(sel); }}>Segarkan</button>
+        <button className="btn ghost" disabled={!chats.length} onClick={removeAll}>Hapus semua</button>
+        <input className="convsearch" type="search" placeholder="Cari nama…" aria-label="Cari percakapan"
+          value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      {!chats.length ? <p className="muted">Belum ada percakapan.</p> : (
+        <div className={"convs" + (sel ? " has-sel" : "")}>
+          <ul className="plain convlist" aria-label="Daftar percakapan">
+            {!shown.length && <li className="muted small">Tidak ada yang cocok.</li>}
+            {shown.map((c) => (
+              <li key={c.id}>
+                <button className={"convitem" + (sel === c.id ? " active" : "")} onClick={() => open(c.id)}>
+                  <b>{c.title}</b>
+                  <span className="muted small">{c.count} pesan · {ago(c.last)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="thread">
+            {!sel ? <p className="muted">Pilih percakapan di sebelah kiri.</p> : (
+              <>
+                <div className="threadhead">
+                  <button className="btn ghost back" onClick={() => { setSel(null); setConv(null); }}>Kembali</button>
+                  <b>{conv?.title || "…"}</b>
+                  <button className="btn ghost" onClick={() => remove(sel)}>Hapus</button>
+                </div>
+                <div className="msgs" role="log" aria-label="Isi percakapan">
+                  {loading && !conv ? <Loader /> : conv?.messages?.length ? conv.messages.map((m, i) => (
+                    <div key={m.t + "-" + i} className={"bubble " + m.r}>
+                      <div className="small muted">{m.r === "bot" ? "Bot" : m.n} · {fmtTime(m.t)}</div>
+                      <div className="logtext">{m.x}</div>
+                    </div>
+                  )) : <p className="muted">Percakapan ini sudah kedaluwarsa.</p>}
+                  <div ref={endRef} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const MENU = [
   { group: "Bot", items: [
     { id: "token", label: "Token bot", icon: "key" },
@@ -157,6 +244,7 @@ const MENU = [
     { id: "test", label: "Tes balasan", icon: "flask" },
   ] },
   { group: "Pengguna", items: [
+    { id: "convs", label: "Percakapan", icon: "chat" },
     { id: "welcome", label: "Pesan sambutan", icon: "chat" },
     { id: "limit", label: "Batas pesan", icon: "clock" },
     { id: "logs", label: "Log pesan", icon: "list" },
@@ -488,6 +576,8 @@ function Dash({ onLogout }) {
           </Btn>
         </section>
       );
+
+      case "convs": return <Convs note={note} />;
 
       case "logs": return (
         <section className="card">

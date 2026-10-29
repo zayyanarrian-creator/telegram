@@ -8,6 +8,7 @@ Bot Telegram yang menjawab pesan memakai Google Gemini, lengkap dengan halaman a
 - **Rotasi hingga 5 API key Gemini.** Key dipakai bergantian. Kalau satu key kena batas atau ditolak, bot otomatis pindah ke key berikutnya.
 - **Status tiap key** di halaman admin: siap atau tidak, sisa waktu istirahat, jumlah berhasil dan gagal, permintaan hari ini, kapan terakhir dipakai, dan error terakhir.
 - **Batas pesan per pengguna**, supaya satu orang tidak menghabiskan kuota semua key.
+- **Percakapan Telegram** di halaman admin: admin bisa melihat isi chat setiap pengguna (pertanyaan dan balasan bot) dalam bentuk percakapan.
 - **Log pesan** di halaman admin: siapa bertanya apa, jawabannya, key mana yang dipakai, dan berapa lama.
 - **Pengaturan lewat `/admin`**: token bot, webhook, model, system prompt, jumlah riwayat, pesan sambutan, pesan cadangan.
 - **Tes balasan** langsung dari halaman admin tanpa lewat Telegram.
@@ -108,7 +109,7 @@ Buka `http://localhost:3000/admin`. Telegram hanya bisa mengirim webhook ke alam
 
 ```
 app/
-  page.js                  halaman depan publik
+  page.js                  halaman depan publik (hanya tautan ke bot)
   admin/page.js            halaman admin
   api/telegram/route.js    penerima webhook Telegram
   api/admin/
@@ -116,6 +117,7 @@ app/
     state/                 status setup dan sesi
     settings/              token dan pengaturan bot
     keys/                  kelola API key dan statusnya
+    chats/                 daftar dan isi percakapan Telegram
     logs/                  baca dan hapus log pesan
     webhook/               pasang, lepas, cek webhook
     test/                  tes balasan
@@ -138,6 +140,7 @@ lib/
 | `rot:idx` | Penghitung rotasi key | Tetap |
 | `hist:{chatId}` | Riwayat percakapan | 7 hari tanpa percakapan |
 | `rl:u:{userId}` | Hitungan batas pesan | Sepanjang rentang waktu batas |
+| `conv:idx`, `conv:meta:{chatId}`, `conv:msgs:{chatId}` | Percakapan Telegram untuk admin (maks. 500 chat, 200 pesan per chat) | 30 hari setelah pesan terakhir |
 | `log:msgs` | Log pesan | 30 hari setelah pesan terakhir |
 | `upd:{id}` | Penanda update Telegram yang sudah diproses | 10 menit |
 | `rl:login:{ip}` | Hitungan percobaan masuk admin | 10 menit |

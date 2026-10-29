@@ -1,6 +1,6 @@
 import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
-import { addLog, checkLimit } from "@/lib/activity";
+import { addLog, addConv, checkLimit } from "@/lib/activity";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -25,10 +25,18 @@ export async function POST(req) {
       const s = settingsFrom(cfg);
       const botToken = await decrypt(cfg.token);
       const chatId = msg.chat.id;
+      const uid = msg.from?.id ?? chatId;
+      const who =
+        [msg.from?.first_name, msg.from?.username ? `@${msg.from.username}` : ""].filter(Boolean).join(" ") ||
+        String(uid);
+      // Nama percakapan: judul grup, atau nama pengirim untuk chat pribadi.
+      const title = msg.chat.title || who;
       const send = async (text) => {
         for (const part of splitText(text)) await tg(botToken, "sendMessage", { chat_id: chatId, text: part });
+        await addConv({ chatId, title, role: "bot", name: "Bot", text });
       };
       const text = msg.text.trim().slice(0, 4000);
+      await addConv({ chatId, title, role: "user", name: who, text });
       const cmd = text.split(/[\s@]/)[0].toLowerCase();
 
       if (cmd === "/start") {
@@ -37,10 +45,6 @@ export async function POST(req) {
         await clearHistory(chatId);
         await send("Riwayat percakapan dihapus. Kita mulai dari awal ya.");
       } else {
-        const uid = msg.from?.id ?? chatId;
-        const who =
-          [msg.from?.first_name, msg.from?.username ? `@${msg.from.username}` : ""].filter(Boolean).join(" ") ||
-          String(uid);
         const t0 = Date.now();
 
         const lim = await checkLimit(uid, s);
