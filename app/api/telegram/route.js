@@ -122,7 +122,7 @@ export async function POST(req) {
           }
           const r = await generateReply({ text: askText, history, settings: s, images });
           if (r.ok) {
-            const d = decorate(r.text);
+            const d = await decorate(r.text, s);
             await send(d.text, d.buttons, r.text);
             await saveTurn(chatId, text, r.text, s.historyLimit);
             await addLog({ uid, name: who, q: text, a: r.text, st: "ok", slot: r.slot, ms: Date.now() - t0 });
