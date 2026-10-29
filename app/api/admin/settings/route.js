@@ -1,4 +1,5 @@
-import { redis, isLoggedIn, encrypt, decrypt, tg, maskToken, DEFAULT_REPLY, json, fail } from "@/lib/server";
+import { redis, isLoggedIn, encrypt, decrypt, tg, maskToken, json, fail } from "@/lib/server";
+import { settingsFrom } from "@/lib/gemini";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -8,17 +9,22 @@ export async function GET() {
   if (c.token) {
     try { masked = maskToken(await decrypt(c.token)); } catch { masked = "(tidak bisa dibaca)"; }
   }
+  const s = settingsFrom(c);
   return json({
     hasToken: !!c.token,
     tokenMasked: masked,
     username: c.username || "",
-    replyText: c.replyText || DEFAULT_REPLY,
+    replyText: s.greeting,
+    model: s.model,
+    systemPrompt: s.systemPrompt,
+    fallbackText: s.fallbackText,
+    historyLimit: s.historyLimit,
   });
 }
 
 export async function POST(req) {
   if (!(await isLoggedIn())) return fail("Belum masuk.", 401);
-  const { token, replyText } = await req.json().catch(() => ({}));
+  const { token, replyText, model, systemPrompt, fallbackText, historyLimit } = await req.json().catch(() => ({}));
   const update = {};
 
   if (typeof token === "string" && token.trim()) {
@@ -31,9 +37,33 @@ export async function POST(req) {
 
   if (typeof replyText === "string") {
     const r = replyText.trim();
-    if (!r) return fail("Teks balasan tidak boleh kosong.");
-    if (r.length > 1000) return fail("Teks balasan maksimal 1000 karakter.");
+    if (!r) return fail("Pesan sambutan tidak boleh kosong.");
+    if (r.length > 1000) return fail("Pesan sambutan maksimal 1000 karakter.");
     update.replyText = r;
+  }
+
+  if (typeof model === "string") {
+    const m = model.trim();
+    if (!/^[A-Za-z0-9._-]{3,60}$/.test(m)) return fail("Nama model tidak valid. Contoh: gemini-3.1-flash-lite");
+    update.model = m;
+  }
+
+  if (typeof systemPrompt === "string") {
+    if (systemPrompt.length > 4000) return fail("System prompt maksimal 4000 karakter.");
+    update.systemPrompt = systemPrompt.trim();
+  }
+
+  if (typeof fallbackText === "string") {
+    const f = fallbackText.trim();
+    if (!f) return fail("Pesan cadangan tidak boleh kosong.");
+    if (f.length > 500) return fail("Pesan cadangan maksimal 500 karakter.");
+    update.fallbackText = f;
+  }
+
+  if (historyLimit !== undefined) {
+    const n = Number(historyLimit);
+    if (!Number.isInteger(n) || n < 0 || n > 20) return fail("Riwayat chat harus angka bulat 0 sampai 20.");
+    update.historyLimit = n;
   }
 
   if (!Object.keys(update).length) return fail("Tidak ada yang disimpan.");
