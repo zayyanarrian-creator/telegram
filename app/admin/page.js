@@ -430,7 +430,14 @@ function Gallery({ note }) {
 
             <div className="itemhead"><b>Foto dan video ({g.items.length}/{max.maxItems})</b></div>
             {g.items.map((it, i) => (
-              <div key={i} className={"itemrow" + (it.name ? " up" : "")}>
+              <div key={i} className={"itemrow th" + (it.name ? " up" : "")}>
+                <span className="itemthumb" aria-hidden="true">
+                  {it.type === "video" ? (
+                    <Icon name="play" size={18} />
+                  ) : it.url ? (
+                    <img src={it.url} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                  ) : null}
+                </span>
                 {it.name ? (
                   <div className="itemname">
                     <span className="muted">{it.type === "video" ? "Video" : "Foto"}</span> · {it.name}{it.size ? ` (${fmtSize(it.size)})` : ""}
