@@ -6,6 +6,11 @@ import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum, wantsMedia,
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// Dipakai saat album dikirim otomatis oleh server.
+const CLAIMS_SENT = /(sudah|telah)\s+(di)?(kirim|bagikan|lihat)|pesan sebelumnya|sebelumnya|already (sent|shared|provided)|earlier|previous message/i;
+const EN_CUE = /\b(photos?|pics?|pictures?|images?|samples?|catalog(ue)?|do you|any|have)\b/i;
+const ID_CUE = /\b(ada|foto|fotonya|gambar|gambarnya|mana|bisa|contoh|mau|dong|lihat|liat|gak|ga|kak|tolong|minta)\b/i;
+
 /* ---------- foto dari pengguna ---------- */
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024; // batas aman agar permintaan ke Gemini tidak terlalu besar
 const MIME_BY_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif" };
@@ -129,7 +134,13 @@ export async function POST(req) {
             // Tag [[GALLERY:id]] dari AI = kirim album galeri itu, lalu teks + tombol.
             const gx = extractGallery(r.text, galleries);
             const gal = gx.gallery || forced;
-            const d = await decorate(gx.text, s, { forceWa: !!gal });
+            // Kalau album dikirim server (AI lupa tag) dan kalimat AI malah bilang "sudah dikirim", ganti dengan kalimat pasti.
+            let reply = gx.text;
+            if (gal && !gx.gallery && CLAIMS_SENT.test(reply)) {
+              const en = EN_CUE.test(caption) && !ID_CUE.test(caption);
+              reply = en ? `Here are our ${gal.name} photos.` : `Berikut foto ${gal.name} kami.`;
+            }
+            const d = await decorate(reply, s, { forceWa: !!gal });
             let buttons = d.buttons;
             let albumErr = "";
             if (gal) {
