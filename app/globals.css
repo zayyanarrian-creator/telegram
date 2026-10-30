@@ -376,6 +376,6 @@ select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
 
 /* ===== Beranda di HP: judul besar lebih dekat ke header ===== */
 @media (max-width: 600px) {
-  .wrap { padding-top: 8px; }
-  .hero { padding-top: 4px; }
+  .wrap { padding-top: 12px; }
+  .hero { padding-top: 12px; }
 }
