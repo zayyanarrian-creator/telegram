@@ -2,7 +2,7 @@ import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
 import { addLog, addConv, checkLimit } from "@/lib/activity";
 import { decorate } from "@/lib/buttons";
-import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum, wantsMedia, matchGallery } from "@/lib/gallery";
+import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum, wantsMedia, wantsMore, matchGallery } from "@/lib/gallery";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -128,12 +128,13 @@ export async function POST(req) {
           }
           const galleries = await getGalleries();
           // Pengunjung minta foto/video produk yang punya galeri: album dikirim walau AI lupa menulis tag.
-          const forced = !isImage && wantsMedia(caption) ? matchGallery(caption, galleries) : null;
+          const more = wantsMore(caption);
+          const forced = !isImage && !more && wantsMedia(caption) ? matchGallery(caption, galleries) : null;
           const r = await generateReply({ text: askText, history, settings: withGalleryPrompt(s, galleries), images });
           if (r.ok) {
             // Tag [[GALLERY:id]] dari AI = kirim album galeri itu, lalu teks + tombol.
             const gx = extractGallery(r.text, galleries);
-            const gal = gx.gallery || forced;
+            const gal = more ? null : (gx.gallery || forced); // minta "yang lain": jangan kirim album lagi
             let reply = gx.text;
             let albumErr = "";
             const en = EN_CUE.test(caption) && !ID_CUE.test(caption);
@@ -150,7 +151,7 @@ export async function POST(req) {
               // Album dikirim server (AI lupa tag) tapi kalimat AI bilang "sudah dikirim": ganti dengan kalimat pasti.
               reply = en ? `Here are our ${gal.name} photos.` : `Berikut foto ${gal.name} kami.`;
             }
-            const d = await decorate(reply, s, { forceWa: !!gal });
+            const d = await decorate(reply, s, { forceWa: !!gal || more });
             let buttons = d.buttons;
             if (gal && !albumErr && gal.pageUrl) {
               const label = gal.buttonLabel || `Galeri ${gal.name}`;
