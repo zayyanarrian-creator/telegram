@@ -379,3 +379,19 @@ select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   .wrap { padding-top: 12px; }
   .hero { padding-top: 12px; }
 }
+
+/* ===== Galeri: miniatur foto di daftar file ===== */
+.itemthumb { width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: var(--bg);
+  border: 1px solid var(--line); display: grid; place-items: center; color: var(--mute); }
+.itemthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.itemrow.th { grid-template-columns: 44px 92px minmax(0, 1fr) auto auto auto; }
+.itemrow.th.up { grid-template-columns: 44px minmax(0, 1fr) auto auto auto; }
+@media (max-width: 560px) {
+  .itemrow.th:not(.up) { grid-template-columns: 44px minmax(0, 1fr) auto auto auto; grid-template-areas: "t s u d r" "i i i i i"; row-gap: 6px; }
+  .itemrow.th:not(.up) > .itemthumb { grid-area: t; }
+  .itemrow.th:not(.up) > select { grid-area: s; }
+  .itemrow.th:not(.up) > input { grid-area: i; }
+  .itemrow.th:not(.up) > button:nth-of-type(1) { grid-area: u; }
+  .itemrow.th:not(.up) > button:nth-of-type(2) { grid-area: d; }
+  .itemrow.th:not(.up) > button:nth-of-type(3) { grid-area: r; }
+}
