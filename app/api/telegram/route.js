@@ -2,6 +2,7 @@ import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
 import { addLog, addConv, checkLimit } from "@/lib/activity";
 import { decorate } from "@/lib/buttons";
+import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum } from "@/lib/gallery";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -120,12 +121,25 @@ export async function POST(req) {
             images = [got.image];
             askText = caption || "(Pengunjung mengirim foto tanpa teks. Jelaskan singkat apa yang terlihat dan tanyakan apa yang ingin dibantu.)";
           }
-          const r = await generateReply({ text: askText, history, settings: s, images });
+          const galleries = await getGalleries();
+          const r = await generateReply({ text: askText, history, settings: withGalleryPrompt(s, galleries), images });
           if (r.ok) {
-            const d = await decorate(r.text, s);
-            await send(d.text, d.buttons, r.text);
+            // Tag [[GALLERY:id]] dari AI = kirim album galeri itu, lalu teks + tombol.
+            const gx = extractGallery(r.text, galleries);
+            const d = await decorate(gx.text, s, { forceWa: !!gx.gallery });
+            let buttons = d.buttons;
+            let albumErr = "";
+            if (gx.gallery) {
+              const ar = await sendAlbum(botToken, chatId, gx.gallery).catch((e) => ({ ok: false, description: e?.message }));
+              if (!ar?.ok) { albumErr = String(ar?.description || "gagal").slice(0, 120); console.error("Album gagal:", albumErr); }
+              if (gx.gallery.pageUrl) {
+                const label = gx.gallery.buttonLabel || `Galeri ${gx.gallery.name}`;
+                buttons = [{ text: `🖼️ ${label}`, url: gx.gallery.pageUrl }, ...buttons].slice(0, 4);
+              }
+            }
+            await send(d.text, buttons, r.text);
             await saveTurn(chatId, text, r.text, s.historyLimit);
-            await addLog({ uid, name: who, q: text, a: r.text, st: "ok", slot: r.slot, ms: Date.now() - t0 });
+            await addLog({ uid, name: who, q: text, a: albumErr ? `${r.text} [Album gagal: ${albumErr}]` : r.text, st: albumErr ? "error" : "ok", slot: r.slot, ms: Date.now() - t0 });
           } else {
             console.error("Gemini gagal:", r.error);
             await send(s.fallbackText);

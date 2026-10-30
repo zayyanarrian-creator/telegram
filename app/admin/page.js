@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 async function api(path, body) {
   const r = await fetch(path, body
@@ -142,6 +143,10 @@ const ICONS = {
   refresh: <><path d="M20 11a8 8 0 0 0-14.5-3.5L4 9m0-5v5h5" /><path d="M4 13a8 8 0 0 0 14.5 3.5L20 15m0 5v-5h-5" /></>,
   trash: <><path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
+  photo: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5L8 20" /></>,
+  up: <path d="M6 15l6-6 6 6" />,
+  down: <path d="M6 9l6 6 6-6" />,
+  play: <path d="M8 5l11 7-11 7z" />,
   back: <path d="M15 5l-7 7 7 7" />,
   logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></>,
 };
@@ -256,9 +261,264 @@ function Convs({ note }) {
   );
 }
 
+/* ---------- Galeri foto & video: bot mengirimnya sebagai album saat pengunjung minta foto ---------- */
+const MAX_PHOTO = 10 * 1024 * 1024;
+const MAX_VIDEO = 20 * 1024 * 1024;
+const fmtSize = (b) => (b / 1048576).toFixed(1).replace(".", ",") + " MB";
+
+function albumSpans(n) {
+  if (n <= 1) return [6];
+  if (n === 2) return [3, 3];
+  if (n === 3) return [6, 3, 3];
+  if (n === 4) return [3, 3, 3, 3];
+  if (n === 5) return [3, 3, 2, 2, 2];
+  return Array(n).fill(2);
+}
+
+function Gallery({ note }) {
+  const [list, setList] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [max, setMax] = useState({ maxGalleries: 20, maxItems: 10 });
+  const [blob, setBlob] = useState(true);
+  const [sel, setSel] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [up, setUp] = useState(null); // { name, pct } selama mengunggah
+  const [upMsg, setUpMsg] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    api("/api/admin/gallery")
+      .then((j) => {
+        setList(j.galleries || []); setProducts(j.products || []); setBlob(!!j.blob);
+        setMax({ maxGalleries: j.maxGalleries, maxItems: j.maxItems });
+      })
+      .catch((e) => { note(e.message, true); setList([]); });
+  }, []);
+
+  if (!list) return <Loader />;
+  const g = list[sel];
+  const nameOf = (id) => products.find((p) => p.id === id)?.name || id;
+  const used = list.map((x) => x.id);
+  const freeProduct = products.find((p) => !used.includes(p.id));
+
+  const upd = (patch) => { setList(list.map((x, i) => (i === sel ? { ...x, ...patch } : x))); setDirty(true); };
+  const setItems = (items) => upd({ items });
+  const updItem = (i, patch) => setItems(g.items.map((it, k) => (k === i ? { ...it, ...patch } : it)));
+  const moveItem = (i, d) => {
+    const a = [...g.items]; const j = i + d;
+    if (j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]];
+    setItems(a);
+  };
+
+  function pickProduct(id) {
+    const p = products.find((x) => x.id === id);
+    upd({ id, name: p.name, keywords: p.keywords });
+  }
+  function addGallery() {
+    if (!freeProduct) return;
+    setList([...list, { id: freeProduct.id, name: freeProduct.name, keywords: freeProduct.keywords, caption: "", pageUrl: "", buttonLabel: "", items: [] }]);
+    setSel(list.length); setDirty(true); setUpMsg(null);
+  }
+  function delGallery() {
+    if (!confirm(`Hapus galeri ${nameOf(g.id)}?`)) return;
+    setList(list.filter((_, i) => i !== sel));
+    setSel(Math.max(0, sel - 1)); setDirty(true);
+  }
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await api("/api/admin/gallery", { galleries: list });
+      setList(r.galleries); setDirty(false); setSel((v) => Math.min(v, Math.max(0, r.galleries.length - 1)));
+      note("Galeri disimpan.");
+    } catch (e) { note(e.message, true); }
+    setSaving(false);
+  }
+
+  async function onFiles(ev) {
+    const files = Array.from(ev.target.files || []);
+    ev.target.value = "";
+    if (!files.length || up) return;
+    let items = [...g.items];
+    let lastMsg = null;
+    for (const f of files) {
+      const video = f.type === "video/mp4";
+      const photo = ["image/jpeg", "image/png", "image/webp"].includes(f.type);
+      if (items.length >= max.maxItems) { lastMsg = { text: `Sudah ${max.maxItems} file, hapus salah satu dulu.`, bad: true }; break; }
+      if (!video && !photo) { lastMsg = { text: `${f.name} ditolak: hanya JPG, PNG, WebP, atau MP4.`, bad: true }; continue; }
+      if (f.size > (video ? MAX_VIDEO : MAX_PHOTO)) {
+        lastMsg = { text: `${f.name} ditolak: ${fmtSize(f.size)}, batas ${video ? "video 20 MB" : "foto 10 MB"}. Kecilkan dulu atau pakai link.`, bad: true };
+        continue;
+      }
+      setUp({ name: f.name, pct: 0 });
+      try {
+        const b = await upload(`galeri/${g.id}/${f.name}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/admin/gallery/upload",
+          onUploadProgress: (p) => setUp({ name: f.name, pct: Math.round(p.percentage || 0) }),
+        });
+        items = [...items, { type: video ? "video" : "photo", url: b.url, name: f.name, size: f.size }];
+        lastMsg = { text: `${f.name} selesai diunggah.` };
+      } catch (e) {
+        lastMsg = { text: `${f.name} gagal diunggah: ${e.message}`, bad: true };
+        break;
+      }
+    }
+    setUp(null);
+    if (items.length !== g.items.length) setList((cur) => cur.map((x, i) => (i === sel ? { ...x, items } : x)));
+    if (items.length !== g.items.length) setDirty(true);
+    setUpMsg(lastMsg);
+  }
+
+  const shown = (g?.items || []).filter((it) => it.url.trim());
+  const spans = albumSpans(shown.length);
+  const gname = g ? nameOf(g.id) : "";
+
+  return (
+    <section className="card">
+      <div className="cardhead tight">
+        <div className="cardtitle"><h2>Galeri foto dan video</h2></div>
+        <Btn busy={saving} disabled={!dirty || saving || !!up} onClick={save}>{saving ? "Menyimpan…" : "Simpan galeri"}</Btn>
+      </div>
+      <p className="muted lead">
+        Kalau pengunjung minta foto atau video sebuah produk, bot mengirim album dari galerinya, lalu tombol ke halaman galeri dan WhatsApp.
+        Unggah file langsung (foto maksimal 10 MB, video MP4 maksimal 20 MB) atau tempel link https. Bot hanya memakai galeri yang punya minimal satu file.
+      </p>
+
+      <div className="galtabs">
+        {list.map((x, i) => (
+          <button key={x.id} type="button" className={"galtab" + (i === sel ? " on" : "")} onClick={() => { setSel(i); setUpMsg(null); }}>
+            {nameOf(x.id)}
+          </button>
+        ))}
+        {freeProduct && list.length < max.maxGalleries && (
+          <button type="button" className="galtab add" onClick={addGallery}><Icon name="plus" size={14} />Tambah</button>
+        )}
+      </div>
+
+      {!g ? (
+        <p className="muted">Belum ada galeri. Tekan Tambah untuk membuat yang pertama, misalnya Hair Bulk.</p>
+      ) : (
+        <div className="galgrid">
+          <div>
+            <div className="field">
+              <label htmlFor="gn">Produk</label>
+              <select id="gn" value={g.id} onChange={(e) => pickProduct(e.target.value)} style={{ width: "100%" }}>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id} disabled={used.includes(p.id) && p.id !== g.id}>
+                    {p.name}{used.includes(p.id) && p.id !== g.id ? " (sudah ada galerinya)" : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="muted small" style={{ marginTop: 4 }}>Kode untuk bot: {g.id} (otomatis)</div>
+            </div>
+            <div className="field">
+              <label htmlFor="gk">Kata lain untuk produk ini</label>
+              <input id="gk" value={g.keywords} maxLength={200} onChange={(e) => upd({ keywords: e.target.value })} />
+            </div>
+            <div className="field">
+              <label htmlFor="gc">Keterangan di bawah foto</label>
+              <textarea id="gc" value={g.caption} maxLength={900} style={{ minHeight: 80 }}
+                placeholder="Contoh hair bulk Super Double Drawn. Foto stok terbaru bisa diminta ke tim lewat WhatsApp."
+                onChange={(e) => upd({ caption: e.target.value })} />
+            </div>
+            <div className="field">
+              <label htmlFor="gp">Link halaman galeri lengkap (opsional)</label>
+              <input id="gp" value={g.pageUrl} maxLength={500} placeholder="https://shop.emahairshop.com/gallery/hair-bulk" onChange={(e) => upd({ pageUrl: e.target.value })} />
+            </div>
+
+            <div className="itemhead"><b>Foto dan video ({g.items.length}/{max.maxItems})</b></div>
+            {g.items.map((it, i) => (
+              <div key={i} className={"itemrow" + (it.name ? " up" : "")}>
+                {it.name ? (
+                  <div className="itemname">
+                    <span className="muted">{it.type === "video" ? "Video" : "Foto"}</span> · {it.name}{it.size ? ` (${fmtSize(it.size)})` : ""}
+                  </div>
+                ) : (
+                  <>
+                    <select value={it.type} onChange={(e) => updItem(i, { type: e.target.value })} aria-label="Jenis">
+                      <option value="photo">Foto</option>
+                      <option value="video">Video</option>
+                    </select>
+                    <input value={it.url} placeholder="https://…" spellCheck={false} onChange={(e) => updItem(i, { url: e.target.value })} aria-label="Link file" />
+                  </>
+                )}
+                <button type="button" className="iconbtn" aria-label="Naikkan" disabled={i === 0} onClick={() => moveItem(i, -1)}><Icon name="up" size={16} /></button>
+                <button type="button" className="iconbtn" aria-label="Turunkan" disabled={i === g.items.length - 1} onClick={() => moveItem(i, 1)}><Icon name="down" size={16} /></button>
+                <button type="button" className="iconbtn" aria-label="Hapus" onClick={() => setItems(g.items.filter((_, k) => k !== i))}><Icon name="trash" size={16} /></button>
+              </div>
+            ))}
+            {!g.items.length && <p className="muted small">Belum ada file.</p>}
+
+            {up && (
+              <div className="upbar" role="status">
+                <div className="muted small">Mengunggah {up.name}… {up.pct}%</div>
+                <div className="upbar-track"><div className="upbar-fill" style={{ width: up.pct + "%" }} /></div>
+              </div>
+            )}
+            {upMsg && <div className={"msg " + (upMsg.bad ? "bad" : "ok")} role="status" style={{ marginTop: 8 }}>{upMsg.text}</div>}
+            {!blob && (
+              <div className="muted small" style={{ marginTop: 8 }}>
+                Unggah file belum aktif: hubungkan Vercel Blob di tab Storage project ini, lalu Redeploy. Tempel link tetap bisa dipakai.
+              </div>
+            )}
+
+            <input ref={fileRef} type="file" multiple hidden accept="image/jpeg,image/png,image/webp,video/mp4" onChange={onFiles} />
+            <div className="row" style={{ marginTop: 8 }}>
+              <Btn disabled={!blob || !!up || g.items.length >= max.maxItems} onClick={() => fileRef.current?.click()}>
+                <Icon name="plus" size={16} />Unggah file
+              </Btn>
+              <Btn className="ghost" disabled={!!up || g.items.length >= max.maxItems} onClick={() => setItems([...g.items, { type: "photo", url: "" }])}>
+                <Icon name="plus" size={16} />Tempel link
+              </Btn>
+              <Btn className="ghost" disabled={!!up} onClick={delGallery}><Icon name="trash" size={16} />Hapus galeri</Btn>
+            </div>
+          </div>
+
+          <div>
+            <div className="muted small" style={{ marginBottom: 8 }}>Pratinjau di Telegram</div>
+            <div className="tgprev">
+              <div className="tgq">Ada fotonya {gname}?</div>
+              <div className="tgbub">
+                {shown.length ? (
+                  <div className="tgalbum">
+                    {shown.map((it, i) => (
+                      <div key={i} className="tgtile" style={{ gridColumn: `span ${spans[i]}`, aspectRatio: spans[i] === 6 ? "16/9" : "1/1" }}>
+                        {it.type === "video" ? (
+                          <span className="tgvid"><Icon name="play" size={22} /></span>
+                        ) : (
+                          <img src={it.url} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="muted small" style={{ padding: 12 }}>Tambahkan foto atau video untuk melihat pratinjau.</div>
+                )}
+                {g.caption && <p className="tgcap">{g.caption}</p>}
+              </div>
+              <div className="tgbtns">
+                {g.pageUrl && <div><Icon name="photo" size={15} />Galeri {gname}</div>}
+                <div className="wa">Tanya via WhatsApp</div>
+              </div>
+            </div>
+            <p className="muted small" style={{ marginTop: 10 }}>
+              Foto dimuat langsung dari linknya. Kotak kosong berarti link belum bisa dibuka. Video ditampilkan sebagai ikon putar.
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const MENU = [
   { group: "Chat", items: [
     { id: "convs", label: "Percakapan", icon: "chat" },
+  ] },
+  { group: "Konten", items: [
+    { id: "gallery", label: "Galeri foto & video", icon: "photo" },
   ] },
   { group: "Bot", items: [
     { id: "token", label: "Token bot", icon: "key" },
@@ -620,6 +880,7 @@ function Dash({ onLogout }) {
       );
 
       case "convs": return <Convs note={note} />;
+      case "gallery": return <Gallery note={note} />;
 
       case "logs": return (
         <section className="card">
