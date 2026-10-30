@@ -2,7 +2,7 @@ import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
 import { addLog, addConv, checkLimit } from "@/lib/activity";
 import { decorate } from "@/lib/buttons";
-import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum } from "@/lib/gallery";
+import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum, wantsMedia, matchGallery } from "@/lib/gallery";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -122,19 +122,22 @@ export async function POST(req) {
             askText = caption || "(Pengunjung mengirim foto tanpa teks. Jelaskan singkat apa yang terlihat dan tanyakan apa yang ingin dibantu.)";
           }
           const galleries = await getGalleries();
+          // Pengunjung minta foto/video produk yang punya galeri: album dikirim walau AI lupa menulis tag.
+          const forced = !isImage && wantsMedia(caption) ? matchGallery(caption, galleries) : null;
           const r = await generateReply({ text: askText, history, settings: withGalleryPrompt(s, galleries), images });
           if (r.ok) {
             // Tag [[GALLERY:id]] dari AI = kirim album galeri itu, lalu teks + tombol.
             const gx = extractGallery(r.text, galleries);
-            const d = await decorate(gx.text, s, { forceWa: !!gx.gallery });
+            const gal = gx.gallery || forced;
+            const d = await decorate(gx.text, s, { forceWa: !!gal });
             let buttons = d.buttons;
             let albumErr = "";
-            if (gx.gallery) {
-              const ar = await sendAlbum(botToken, chatId, gx.gallery).catch((e) => ({ ok: false, description: e?.message }));
+            if (gal) {
+              const ar = await sendAlbum(botToken, chatId, gal).catch((e) => ({ ok: false, description: e?.message }));
               if (!ar?.ok) { albumErr = String(ar?.description || "gagal").slice(0, 120); console.error("Album gagal:", albumErr); }
-              if (gx.gallery.pageUrl) {
-                const label = gx.gallery.buttonLabel || `Galeri ${gx.gallery.name}`;
-                buttons = [{ text: `🖼️ ${label}`, url: gx.gallery.pageUrl }, ...buttons].slice(0, 4);
+              if (gal.pageUrl) {
+                const label = gal.buttonLabel || `Galeri ${gal.name}`;
+                buttons = [{ text: `🖼️ ${label}`, url: gal.pageUrl }, ...buttons].slice(0, 4);
               }
             }
             await send(d.text, buttons, r.text);
