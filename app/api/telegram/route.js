@@ -134,25 +134,30 @@ export async function POST(req) {
             // Tag [[GALLERY:id]] dari AI = kirim album galeri itu, lalu teks + tombol.
             const gx = extractGallery(r.text, galleries);
             const gal = gx.gallery || forced;
-            // Kalau album dikirim server (AI lupa tag) dan kalimat AI malah bilang "sudah dikirim", ganti dengan kalimat pasti.
             let reply = gx.text;
-            if (gal && !gx.gallery && CLAIMS_SENT.test(reply)) {
-              const en = EN_CUE.test(caption) && !ID_CUE.test(caption);
+            let albumErr = "";
+            const en = EN_CUE.test(caption) && !ID_CUE.test(caption);
+            if (gal) {
+              const ar = await sendAlbum(botToken, chatId, gal).catch((e) => ({ ok: false, description: e?.message }));
+              if (!ar?.ok) { albumErr = String(ar?.description || "gagal").slice(0, 300); console.error("Album gagal:", albumErr); }
+            }
+            if (gal && albumErr) {
+              // Album gagal: jangan mengaku sudah mengirim.
+              reply = en
+                ? "Sorry, I couldn't send the photos right now. Please ask the team via WhatsApp."
+                : "Maaf, fotonya belum bisa dikirim sekarang. Silakan tanyakan ke tim lewat WhatsApp.";
+            } else if (gal && !gx.gallery && CLAIMS_SENT.test(reply)) {
+              // Album dikirim server (AI lupa tag) tapi kalimat AI bilang "sudah dikirim": ganti dengan kalimat pasti.
               reply = en ? `Here are our ${gal.name} photos.` : `Berikut foto ${gal.name} kami.`;
             }
             const d = await decorate(reply, s, { forceWa: !!gal });
             let buttons = d.buttons;
-            let albumErr = "";
-            if (gal) {
-              const ar = await sendAlbum(botToken, chatId, gal).catch((e) => ({ ok: false, description: e?.message }));
-              if (!ar?.ok) { albumErr = String(ar?.description || "gagal").slice(0, 120); console.error("Album gagal:", albumErr); }
-              if (gal.pageUrl) {
-                const label = gal.buttonLabel || `Galeri ${gal.name}`;
-                buttons = [{ text: `🖼️ ${label}`, url: gal.pageUrl }, ...buttons].slice(0, 4);
-              }
+            if (gal && !albumErr && gal.pageUrl) {
+              const label = gal.buttonLabel || `Galeri ${gal.name}`;
+              buttons = [{ text: `🖼️ ${label}`, url: gal.pageUrl }, ...buttons].slice(0, 4);
             }
             await send(d.text, buttons, r.text);
-            await saveTurn(chatId, text, r.text, s.historyLimit);
+            await saveTurn(chatId, text, albumErr ? reply : r.text, s.historyLimit);
             await addLog({ uid, name: who, q: text, a: albumErr ? `${r.text} [Album gagal: ${albumErr}]` : r.text, st: albumErr ? "error" : "ok", slot: r.slot, ms: Date.now() - t0 });
           } else {
             console.error("Gemini gagal:", r.error);
