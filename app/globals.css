@@ -402,3 +402,13 @@ select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   .itemrow.th:not(.up) > button:nth-of-type(2) { grid-area: d; }
   .itemrow.th:not(.up) > button:nth-of-type(3) { grid-area: r; }
 }
+
+/* ===== Admin HP: kepala percakapan rapi ===== */
+@media (max-width: 600px) {
+  .threadhead { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "back del" "name name"; gap: 12px 10px; align-items: center; }
+  .threadhead .back { grid-area: back; justify-self: start; }
+  .threadhead .danger { grid-area: del; justify-self: end; }
+  .threadhead b { grid-area: name; flex: none; }
+  .threadhead b .small { white-space: nowrap; margin-top: 2px; }
+  .bubble { max-width: 92%; }
+}
