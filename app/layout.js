@@ -2,7 +2,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
-  title: "EMAHAIRSHOP Bot | Tanya Produk Hair Extension via Telegram",
+  title: "EMAHAIRSHOP | Tanya Produk Hair Extension via Telegram",
   description: "Bot Telegram resmi EMAHAIRSHOP. Tanya produk human hair extension, harga grosir, dan stok kapan saja, dijawab otomatis saat itu juga.",
   icons: { icon: "https://emahairshop.com/favicon.svg" },
 };
