@@ -1,6 +1,6 @@
 import { redis, decrypt, tg } from "@/lib/server";
 import { generateReply, settingsFrom, getHistory, saveTurn, clearHistory, splitText } from "@/lib/gemini";
-import { addLog, addConv, checkLimit } from "@/lib/activity";
+import { addLog, addConv, checkLimit, addUnans, looksUnsure } from "@/lib/activity";
 import { decorate } from "@/lib/buttons";
 import { getGalleries, withGalleryPrompt, extractGallery, sendAlbum, wantsMedia, wantsMore, matchGallery } from "@/lib/gallery";
 export const dynamic = "force-dynamic";
@@ -159,11 +159,13 @@ export async function POST(req) {
             }
             await send(d.text, buttons, r.text);
             await saveTurn(chatId, text, albumErr ? reply : r.text, s.historyLimit);
+            if (looksUnsure(r.text)) await addUnans({ uid, name: who, q: text, a: r.text, why: "unsure" });
             await addLog({ uid, name: who, q: text, a: albumErr ? `${r.text} [Album gagal: ${albumErr}]` : r.text, st: albumErr ? "error" : "ok", slot: r.slot, ms: Date.now() - t0 });
           } else {
             console.error("Gemini gagal:", r.error);
             await send(s.fallbackText);
             await addLog({ uid, name: who, q: text, a: r.error, st: "error", ms: Date.now() - t0 });
+            await addUnans({ uid, name: who, q: text, a: r.error, why: "error" });
           }
         }
       }
