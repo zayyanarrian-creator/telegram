@@ -20,7 +20,7 @@ export default function HomeView({ link }) {
 
   useEffect(() => {
     document.documentElement.lang = lg;
-    document.documentElement.dir = lg === "ar" ? "rtl" : "ltr";
+    document.documentElement.dir = "ltr";
     document.title = t.title;
   }, [lg, t]);
 
